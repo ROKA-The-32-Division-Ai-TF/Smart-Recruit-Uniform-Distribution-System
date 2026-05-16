@@ -39,6 +39,7 @@ npm run serve
 3. Apps Script의 프로젝트 설정 또는 스크립트 속성에 아래 값을 설정합니다.
    - `SPREADSHEET_ID`: 저장할 Google Sheets ID
    - `ADMIN_PIN`: 관리자 화면 PIN
+   - 두 값은 GitHub 저장소나 `docs/` 파일에 넣지 않습니다. Apps Script의 `스크립트 속성`에만 둡니다.
 4. Apps Script에서 `setup()`을 한 번 실행해 시트를 만듭니다. 이 단계는 배포 후 `npm run test-api -- "관리자PIN"`을 실행해도 자동으로 처리됩니다.
 5. 배포 → 새 배포 → 웹 앱
    - 실행 사용자: 나
@@ -84,6 +85,14 @@ Google Sheets의 `raw_records`는 품목 1개당 1행으로 저장합니다.
 - 추천방식은 `upper`, `lower`, `outer`, `inner`, `shoes`, `manual`을 사용합니다.
 
 정적 GitHub Pages 프론트엔드가 GitHub 저장소에 직접 쓰도록 만들면 토큰이 노출될 수 있으므로, v1은 Apps Script가 설정 저장 API 역할을 합니다. GitHub Actions는 정적 앱 배포에 쓰고, 현장 설정 변경은 Google Sheets/Apps Script 런타임 설정으로 즉시 반영하는 구조입니다.
+
+## 보안 메모
+
+- `ADMIN_PIN`, `SPREADSHEET_ID`, GitHub 토큰, Google API 키는 클라이언트 코드와 저장소에 넣지 않습니다.
+- `docs/data/distribution-config.json`의 Apps Script Web App URL은 공개 호출 주소입니다. 비밀키가 아니며, 실제 권한 검사는 Apps Script 서버 코드에서 처리합니다.
+- 관리자 조회와 설정 저장은 `ADMIN_PIN` 검증 후에만 실행됩니다.
+- Apps Script는 `ADMIN_PIN` 또는 `SPREADSHEET_ID` 속성이 없으면 기본값으로 동작하지 않고 실패합니다.
+- 신병 제출 API는 QR 접속자가 써야 하므로 공개되어 있습니다. 운영 전에는 테스트 데이터 삭제와 관리자 PIN 변경을 권장합니다.
 
 ## 운영 흐름
 

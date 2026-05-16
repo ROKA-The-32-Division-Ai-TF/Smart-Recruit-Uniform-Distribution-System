@@ -4,7 +4,7 @@ const PERSON_SHEET = "summary_by_person";
 const EXCHANGE_SHEET = "exchange_summary";
 const CONFIG_SHEET = "runtime_config";
 const CONFIG_CHUNK_SIZE = 45000;
-const SCRIPT_CODE_VERSION = "2026-05-16-size-logic-v2";
+const SCRIPT_CODE_VERSION = "2026-05-17-security-v1";
 
 const RAW_HEADERS = [
   "submission_id",
@@ -216,7 +216,10 @@ function saveConfig_(payload) {
 }
 
 function assertAdmin_(adminPin) {
-  const savedPin = PropertiesService.getScriptProperties().getProperty("ADMIN_PIN") || "0000";
+  const savedPin = PropertiesService.getScriptProperties().getProperty("ADMIN_PIN");
+  if (!savedPin) {
+    throw new Error("ADMIN_PIN 스크립트 속성이 설정되지 않았습니다.");
+  }
   if (String(adminPin || "") !== String(savedPin)) {
     throw new Error("관리자 PIN이 올바르지 않습니다.");
   }
@@ -472,10 +475,8 @@ function getOrCreateSheet_(name) {
 
 function getSpreadsheet_() {
   const id = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID");
-  if (id) return SpreadsheetApp.openById(id);
-  const active = SpreadsheetApp.getActiveSpreadsheet();
-  if (!active) throw new Error("스프레드시트를 찾을 수 없습니다. SPREADSHEET_ID 속성을 설정해 주세요.");
-  return active;
+  if (!id) throw new Error("SPREADSHEET_ID 스크립트 속성을 설정해 주세요.");
+  return SpreadsheetApp.openById(id);
 }
 
 function rowToObject_(headers, row) {
