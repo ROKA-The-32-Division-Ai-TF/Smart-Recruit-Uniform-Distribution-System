@@ -37,7 +37,7 @@ assert(before.ok, "adminSummary 최초 조회 실패");
 
 const recruitNo = `99${Date.now().toString().slice(-8)}`;
 console.log(`live smoke recruitNo: ${recruitNo}`);
-const profile = buildProfile({ recruitNo, height: 177, weight: 74 });
+const profile = buildProfile({ recruitNo, height: 177, weight: 74, footSize: 265, headSize: 58 });
 const initialStatus = await post(endpoint, "getStatus", {
   recruitNo,
   roundIds: config.rounds.map((round) => round.roundId)

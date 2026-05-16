@@ -25,7 +25,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -192,7 +193,7 @@ button:disabled {
 
 .input-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0;
   min-height: 158px;
   padding: 22px 16px 16px;
@@ -242,7 +243,8 @@ button:disabled {
   font-weight: 950;
 }
 
-.input-grid input {
+.input-grid input,
+.input-grid select {
   width: 100%;
   min-width: 0;
   min-height: 50px;
@@ -254,6 +256,10 @@ button:disabled {
   font-size: 1.25rem;
   font-weight: 950;
   outline: 0;
+}
+
+.input-grid select {
+  appearance: none;
 }
 
 .input-grid input::placeholder {
@@ -307,7 +313,8 @@ button:disabled {
   padding: 0 4px;
 }
 
-.input-screen.has-results .input-grid input {
+.input-screen.has-results .input-grid input,
+.input-screen.has-results .input-grid select {
   min-height: 36px;
   font-size: 1.12rem;
 }
@@ -2620,6 +2627,7 @@ button:disabled {
   }
 
   .input-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     min-height: 138px;
     padding: 18px 10px 12px;
     border-radius: 24px;
@@ -2643,7 +2651,8 @@ button:disabled {
     font-size: 0.78rem;
   }
 
-  .input-grid input {
+  .input-grid input,
+  .input-grid select {
     min-height: 44px;
     font-size: 1.08rem;
   }

@@ -57,9 +57,27 @@ function renderInput(message = "") {
               <em>kg</em>
             </div>
           </label>
+          <label class="profile-field">
+            <span>발</span>
+            <div class="field-input-wrap">
+              <select name="footSize" aria-label="발 사이즈">
+                ${renderFootSizeOptions(state.profile?.footSize)}
+              </select>
+              <em>mm</em>
+            </div>
+          </label>
+          <label class="profile-field">
+            <span>머리</span>
+            <div class="field-input-wrap">
+              <select name="headSize" aria-label="머리둘레">
+                ${renderHeadSizeOptions(state.profile?.headSize)}
+              </select>
+              <em>호</em>
+            </div>
+          </label>
         </div>
         <div class="input-line"></div>
-        <p class="input-note">입력 후 선택된 불출 차수의 전체 추천 사이즈가 아래에 표시됩니다.</p>
+        <p class="input-note">의류는 자동 추천하고, 신발과 모자는 선택한 실측값을 반영합니다.</p>
         <button class="primary-button" type="submit">추천 사이즈 보기</button>
         <p id="formMessage" class="form-message">${esc(message)}</p>
       </form>
@@ -73,15 +91,38 @@ function renderInput(message = "") {
   bindRecommendationControls();
 }
 
+function renderFootSizeOptions(selectedValue) {
+  const selected = String(selectedValue || "");
+  const values = [];
+  for (let size = 240; size <= 320; size += 5) values.push(size);
+  return [
+    `<option value="">선택</option>`,
+    ...values.map((size) => `<option value="${size}" ${selected === String(size) ? "selected" : ""}>${size}</option>`)
+  ].join("");
+}
+
+function renderHeadSizeOptions(selectedValue) {
+  const selected = String(selectedValue || "");
+  const values = [];
+  for (let size = 52; size <= 62; size += 1) values.push(size);
+  return [
+    `<option value="">선택</option>`,
+    ...values.map((size) => `<option value="${size}" ${selected === String(size) ? "selected" : ""}>${size}</option>`)
+  ].join("");
+}
+
 async function handleProfileSubmit(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const raw = {
     recruitNo: form.get("recruitNo"),
     height: form.get("height"),
-    weight: form.get("weight")
+    weight: form.get("weight"),
+    footSize: form.get("footSize"),
+    headSize: form.get("headSize")
   };
-  const errors = validateProfileInput(raw);
+  const currentRoundItems = getRoundItems(state.config, getSelectedRound());
+  const errors = validateProfileInput(raw, currentRoundItems);
   if (errors.length) {
     document.querySelector("#formMessage").textContent = errors[0];
     return;
@@ -94,6 +135,11 @@ async function handleProfileSubmit(event) {
     const routing = syncRoundWithStatus();
     if (routing.allDone) {
       renderDone("모든 불출 차수가 완료되었습니다.", state.status.records || []);
+      return;
+    }
+    const routedErrors = validateProfileInput(raw, getRoundItems(state.config, state.round));
+    if (routedErrors.length) {
+      renderInput(routedErrors[0]);
       return;
     }
     refreshIssueItems();
@@ -160,7 +206,7 @@ function renderRecommendationPanel(round) {
           <span>${esc(round.label)}</span>
           <h1>추천 사이즈표</h1>
         </div>
-        <p>교번 ${esc(state.profile.recruitNo)} · ${state.profile.height}cm · ${state.profile.weight}kg</p>
+        <p>${renderProfileMeta()}</p>
       </div>
       <p class="recommendation-hint">품목을 터치하면 사진과 세부 사이즈표를 확인할 수 있습니다.</p>
       <div class="size-card-grid">
@@ -171,6 +217,17 @@ function renderRecommendationPanel(round) {
   `;
 }
 
+function renderProfileMeta() {
+  const parts = [
+    `교번 ${state.profile.recruitNo}`,
+    `${state.profile.height}cm`,
+    `${state.profile.weight}kg`
+  ];
+  if (Number.isFinite(state.profile.footSize)) parts.push(`발 ${state.profile.footSize}mm`);
+  if (Number.isFinite(state.profile.headSize)) parts.push(`머리 ${state.profile.headSize}호`);
+  return esc(parts.join(" · "));
+}
+
 function renderSizeCard(item) {
   const recommendation = item.recommendation;
   return `
@@ -178,9 +235,9 @@ function renderSizeCard(item) {
       <div class="card-body">
         <div class="card-title-row">
           <h2>${esc(item.label)}</h2>
-          <span>${item.finalSize !== recommendation.recommendedSize ? "교체됨" : "추천"}</span>
+          <span>${item.finalSize !== recommendation.recommendedSize ? "교체됨" : recommendation.inputMode === "direct" ? "선택" : "추천"}</span>
         </div>
-        <p>${item.finalSize !== recommendation.recommendedSize ? "최종 선택 사이즈" : "백룡AI 추천 사이즈"}</p>
+        <p>${item.finalSize !== recommendation.recommendedSize ? "최종 선택 사이즈" : recommendation.inputMode === "direct" ? "실측 선택 사이즈" : "백룡AI 추천 사이즈"}</p>
         <strong class="card-size">${esc(item.finalSize)}</strong>
       </div>
     </button>
@@ -361,7 +418,7 @@ function renderReview(message = "") {
           )
           .join("")}
       </div>
-      <p class="review-meta">교번 ${esc(state.profile.recruitNo)} · 키 ${state.profile.height}cm · 몸무게 ${state.profile.weight}kg</p>
+      <p class="review-meta">${renderProfileMeta()}</p>
       <button id="submitIssue" class="primary-button" type="button">최종 확정</button>
       <button id="backToItems" class="ghost-button" type="button">품목 다시 확인</button>
       <p id="submitMessage" class="form-message">${esc(message)}</p>
@@ -382,7 +439,7 @@ function openSubmitConfirm() {
   sheet.innerHTML = `
     <div class="confirm-panel" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
       <h2 id="confirmTitle">최종 확정할까요?</h2>
-      <p>확정하면 현재 선택된 사이즈가 불출 내역으로 저장됩니다.</p>
+        <p>확정하면 현재 선택된 사이즈가 불출 내역으로 저장됩니다.</p>
       <div class="confirm-summary">
         ${state.issueItems.map((item) => `
           <span>

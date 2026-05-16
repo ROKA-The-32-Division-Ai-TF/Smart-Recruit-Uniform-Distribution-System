@@ -69,6 +69,8 @@ export function buildSubmissionPayload({ config, round, profile, issueItems }) {
     recruitNo: profile.recruitNo,
     height: profile.height,
     weight: profile.weight,
+    footSize: profile.footSize,
+    headSize: profile.headSize,
     bmi: profile.bmi,
     configVersion: config.configVersion,
     roundId: round.roundId,
@@ -149,7 +151,9 @@ function mockSubmitIssue(config, payload) {
     final_size: item.finalSize,
     changed: item.changed ? "Y" : "N",
     change_reason: item.changeReason || "",
-    config_version: config.configVersion
+    config_version: config.configVersion,
+    foot_size: Number(payload.footSize) || "",
+    head_size: Number(payload.headSize) || ""
   }));
   writeRecords([...records, ...rows]);
   return { ok: true, duplicate: false, records: rows };
@@ -189,6 +193,8 @@ function buildSummary(config, records) {
       recruitNo: row.recruit_no,
       height: row.height_cm,
       weight: row.weight_kg,
+      footSize: row.foot_size,
+      headSize: row.head_size,
       roundId: row.round_id,
       roundName: row.round_name,
       changedCount: 0,

@@ -550,12 +550,14 @@ function renderPersonPanel(summary) {
               <th>차수</th>
               <th>키</th>
               <th>몸무게</th>
+              <th>발</th>
+              <th>머리</th>
               ${summary.personColumns.map((column) => `<th>${esc(column)}</th>`).join("")}
               <th>교체</th>
             </tr>
           </thead>
           <tbody>
-            ${summary.personSummary.map((row) => renderPersonRow(row, summary.personColumns)).join("") || `<tr><td colspan="${summary.personColumns.length + 5}">저장된 불출 내역이 없습니다.</td></tr>`}
+            ${summary.personSummary.map((row) => renderPersonRow(row, summary.personColumns)).join("") || `<tr><td colspan="${summary.personColumns.length + 7}">저장된 불출 내역이 없습니다.</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -665,6 +667,8 @@ function buildSummaryFromRecords(summary, records) {
       recruitNo: String(row.recruit_no || ""),
       height: row.height_cm,
       weight: row.weight_kg,
+      footSize: row.foot_size,
+      headSize: row.head_size,
       roundId: String(row.round_id || ""),
       roundName: String(row.round_name || ""),
       changedCount: 0,
@@ -830,6 +834,8 @@ function renderPersonRow(row, columns) {
       <td>${esc(row.roundName)}</td>
       <td>${esc(row.height)}</td>
       <td>${esc(row.weight)}</td>
+      <td>${esc(row.footSize || "-")}</td>
+      <td>${esc(row.headSize || "-")}</td>
       ${columns.map((column) => `<td>${esc(row.items[column] || "-")}</td>`).join("")}
       <td>${row.changedCount ? "있음" : "없음"}</td>
     </tr>

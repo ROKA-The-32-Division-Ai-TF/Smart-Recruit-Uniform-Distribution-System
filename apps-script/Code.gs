@@ -4,7 +4,7 @@ const PERSON_SHEET = "summary_by_person";
 const EXCHANGE_SHEET = "exchange_summary";
 const CONFIG_SHEET = "runtime_config";
 const CONFIG_CHUNK_SIZE = 45000;
-const SCRIPT_CODE_VERSION = "2026-05-16-duplicate-round-guard";
+const SCRIPT_CODE_VERSION = "2026-05-16-size-logic-v2";
 
 const RAW_HEADERS = [
   "submission_id",
@@ -21,7 +21,9 @@ const RAW_HEADERS = [
   "final_size",
   "changed",
   "change_reason",
-  "config_version"
+  "config_version",
+  "foot_size",
+  "head_size"
 ];
 
 function doPost(e) {
@@ -171,7 +173,9 @@ function submitIssue_(payload) {
         item.finalSize,
         item.changed ? "Y" : "N",
         item.changeReason || "",
-        payload.configVersion || ""
+        payload.configVersion || "",
+        Number(payload.footSize) || "",
+        Number(payload.headSize) || ""
       ];
     });
 
@@ -276,9 +280,9 @@ function refreshSummaries_() {
     return [row.roundId, row.roundName, row.itemId, row.itemName, row.size, row.count, row.changedCount];
   }));
 
-  const personHeaders = ["recruit_no", "round_id", "round_name", "height_cm", "weight_kg"].concat(summary.personColumns).concat(["changed_count"]);
+  const personHeaders = ["recruit_no", "round_id", "round_name", "height_cm", "weight_kg", "foot_size", "head_size"].concat(summary.personColumns).concat(["changed_count"]);
   writeSheet_(PERSON_SHEET, personHeaders, summary.personSummary.map(function(row) {
-    return [row.recruitNo, row.roundId, row.roundName, row.height, row.weight]
+    return [row.recruitNo, row.roundId, row.roundName, row.height, row.weight, row.footSize, row.headSize]
       .concat(summary.personColumns.map(function(column) { return row.items[column] || ""; }))
       .concat([row.changedCount]);
   }));
@@ -319,6 +323,8 @@ function buildSummary_(records) {
       recruitNo: row.recruit_no,
       height: row.height_cm,
       weight: row.weight_kg,
+      footSize: row.foot_size,
+      headSize: row.head_size,
       roundId: row.round_id,
       roundName: row.round_name,
       changedCount: 0,
@@ -385,7 +391,7 @@ function ensureSheets_() {
   const rawSheet = getOrCreateSheet_(RAW_SHEET);
   ensureHeader_(rawSheet, RAW_HEADERS);
   ensureHeader_(getOrCreateSheet_(SIZE_SHEET), ["round_id", "round_name", "item_id", "item_name", "final_size", "count", "changed_count"]);
-  ensureHeader_(getOrCreateSheet_(PERSON_SHEET), ["recruit_no", "round_id", "round_name", "height_cm", "weight_kg", "changed_count"]);
+  ensureHeader_(getOrCreateSheet_(PERSON_SHEET), ["recruit_no", "round_id", "round_name", "height_cm", "weight_kg", "foot_size", "head_size", "changed_count"]);
   ensureHeader_(getOrCreateSheet_(EXCHANGE_SHEET), ["round_id", "round_name", "item_id", "item_name", "total_count", "changed_count", "change_rate"]);
   ensureHeader_(getOrCreateSheet_(CONFIG_SHEET), ["chunk_index", "json_chunk", "updated_at"]);
 }
