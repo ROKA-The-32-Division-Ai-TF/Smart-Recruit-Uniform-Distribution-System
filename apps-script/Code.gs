@@ -4,6 +4,7 @@ const PERSON_SHEET = "summary_by_person";
 const EXCHANGE_SHEET = "exchange_summary";
 const CONFIG_SHEET = "runtime_config";
 const CONFIG_CHUNK_SIZE = 45000;
+const SCRIPT_CODE_VERSION = "2026-05-16-duplicate-round-guard";
 
 const RAW_HEADERS = [
   "submission_id",
@@ -78,6 +79,8 @@ function ping_() {
   const result = {
     ok: true,
     service: "Smart Recruit Uniform Distribution System",
+    codeVersion: SCRIPT_CODE_VERSION,
+    duplicatePolicy: "submission_id_and_recruit_round",
     spreadsheetOk: false,
     spreadsheetName: "",
     sheets: []
