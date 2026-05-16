@@ -80,7 +80,7 @@ export function buildSubmissionPayload({ config, round, profile, issueItems }) {
       itemName: item.label,
       recommendedSize: item.recommendation.recommendedSize,
       finalSize: item.finalSize,
-      changed: item.finalSize !== item.recommendation.recommendedSize,
+      changed: item.recommendation.inputMode !== "direct" && item.finalSize !== item.recommendation.recommendedSize,
       changeReason: item.changeReason || ""
     }))
   };

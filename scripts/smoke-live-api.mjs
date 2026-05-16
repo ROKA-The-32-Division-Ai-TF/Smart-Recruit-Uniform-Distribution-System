@@ -37,7 +37,7 @@ assert(before.ok, "adminSummary 최초 조회 실패");
 
 const recruitNo = `99${Date.now().toString().slice(-8)}`;
 console.log(`live smoke recruitNo: ${recruitNo}`);
-const profile = buildProfile({ recruitNo, height: 177, weight: 74, footSize: 265, headSize: 58 });
+const profile = buildProfile({ recruitNo, height: 177, weight: 74 });
 const initialStatus = await post(endpoint, "getStatus", {
   recruitNo,
   roundIds: config.rounds.map((round) => round.roundId)
@@ -49,7 +49,7 @@ for (const round of config.rounds) {
   const roundItems = getRoundItems(config, round);
   assert(roundItems.length > 0, `${round.label}에 품목이 없습니다.`);
 
-  const issueItems = recommendRoundItems(roundItems, profile);
+  const issueItems = recommendRoundItems(roundItems, profile).map(applySmokeDirectSelection);
   const payload = buildSubmissionPayload({ config, round, profile, issueItems });
   payload.submissionId = `live-smoke-${recruitNo}-${round.roundId}`;
 
@@ -136,4 +136,23 @@ async function post(url, action, payload) {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function applySmokeDirectSelection(item) {
+  if (item.recommendation.inputMode !== "direct") return item;
+  const preferred = preferredDirectSize(item);
+  return {
+    ...item,
+    finalSize: preferred,
+    changed: false,
+    changeReason: "직접 선택"
+  };
+}
+
+function preferredDirectSize(item) {
+  const sizes = (item.sizes || []).map(String);
+  const preferred = item.recommendationType === "shoes" ? "265" :
+    item.recommendationType === "beret" ? "58" :
+      "중";
+  return sizes.includes(preferred) ? preferred : sizes[Math.floor(sizes.length / 2)] || "";
 }

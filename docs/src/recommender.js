@@ -29,18 +29,14 @@ export const REC_CONFIG = {
   ]
 };
 
-export function buildProfile({ recruitNo, height, weight, footSize, headSize }) {
+export function buildProfile({ recruitNo, height, weight }) {
   const heightNum = Number(height);
   const weightNum = Number(weight);
-  const footSizeNum = normalizeFootSize(footSize);
-  const headSizeNum = normalizeHeadSize(headSize);
   const bmiValue = bmi(heightNum, weightNum);
   return {
     recruitNo: String(recruitNo || "").trim(),
     height: heightNum,
     weight: weightNum,
-    footSize: footSizeNum,
-    headSize: headSizeNum,
     bmi: bmiValue,
     bmiLabel: bmiLabel(bmiValue)
   };
@@ -51,7 +47,7 @@ export function bmi(height, weight) {
   return Number((Number(weight) / (meters * meters)).toFixed(1));
 }
 
-export function validateProfileInput({ recruitNo, height, weight, footSize, headSize }, items = []) {
+export function validateProfileInput({ recruitNo, height, weight }) {
   const errors = [];
   if (!String(recruitNo || "").trim()) errors.push("교번을 입력해 주세요.");
   const heightNum = Number(height);
@@ -62,21 +58,6 @@ export function validateProfileInput({ recruitNo, height, weight, footSize, head
   if (!Number.isFinite(weightNum) || weightNum < 35 || weightNum > 160) {
     errors.push("몸무게는 35kg부터 160kg 사이로 입력해 주세요.");
   }
-
-  const needsFoot = items.some((item) => isFootType(item.recommendationType));
-  const needsHead = items.some((item) => isHeadType(item.recommendationType));
-  const footSizeNum = normalizeFootSize(footSize);
-  const headSizeNum = normalizeHeadSize(headSize);
-  if (needsFoot && !Number.isFinite(footSizeNum)) {
-    errors.push("발 사이즈를 선택해 주세요.");
-  } else if (Number.isFinite(footSizeNum) && (footSizeNum < 220 || footSizeNum > 330)) {
-    errors.push("발 사이즈는 220mm부터 330mm 사이로 입력해 주세요.");
-  }
-  if (needsHead && !Number.isFinite(headSizeNum)) {
-    errors.push("머리둘레를 선택해 주세요.");
-  } else if (Number.isFinite(headSizeNum) && (headSizeNum < 50 || headSizeNum > 65)) {
-    errors.push("머리둘레는 50호부터 65호 사이로 입력해 주세요.");
-  }
   return errors;
 }
 
@@ -85,14 +66,14 @@ export function recommendForItem(item, profile, recConfig = REC_CONFIG) {
   const type = normalizeType(item.recommendationType);
   const target = buildTarget(item, profile, parsedSizes, recConfig);
   const ranked = rankSizes(parsedSizes, target);
-  const primary = ranked[0]?.raw || item.sizes?.[0] || "-";
-  const alternatives = buildNeighborAlternatives(parsedSizes, primary).map(({ entry, relation }) => ({
+  const primary = target.inputMode === "direct" ? "" : ranked[0]?.raw || item.sizes?.[0] || "-";
+  const alternatives = primary ? buildNeighborAlternatives(parsedSizes, primary).map(({ entry, relation }) => ({
     size: entry.raw,
     measureOne: formatMeasureOne(entry, type),
     measureTwo: formatMeasureTwo(entry, relation, type),
     relation,
     selected: entry.raw === primary
-  }));
+  })) : [];
 
   return {
     itemId: item.itemId,
@@ -204,35 +185,31 @@ function buildTarget(item, profile, parsedSizes, recConfig) {
 }
 
 function buildFootTarget(type, profile, parsedSizes) {
-  const footSize = Number.isFinite(profile.footSize) ? profile.footSize : parsedSizes[0]?.width;
   return {
-    width: clampToAvailable(footSize, parsedSizes.map((size) => size.width).filter(Number.isFinite)),
+    width: null,
     height: null,
     candidates: parsedSizes,
     inputMode: "direct",
-    description: type === "shoes" ? "발 사이즈 선택값 기준" : "실측 선택값 기준"
+    description: type === "shoes" ? "발 사이즈 직접 선택" : "실측 직접 선택"
   };
 }
 
 function buildHeadTarget(item, type, profile, parsedSizes, recConfig) {
-  const headSize = Number.isFinite(profile.headSize) ? profile.headSize : parsedSizes[0]?.width;
   if (type === "head_sml") {
-    const ranges = item.sizeRules?.headRanges || recConfig.headRanges;
-    const selected = ranges.find((range) => Number(headSize) <= Number(range.max)) || ranges[ranges.length - 1];
     return {
-      label: selected?.size || parsedSizes[0]?.raw || "-",
+      label: null,
       candidates: parsedSizes,
       inputMode: "direct",
-      description: "머리둘레 선택값 기준"
+      description: "머리 사이즈 직접 선택"
     };
   }
 
   return {
-    width: clampToAvailable(headSize, parsedSizes.map((size) => size.width).filter(Number.isFinite)),
+    width: null,
     height: null,
     candidates: parsedSizes,
     inputMode: "direct",
-    description: "머리둘레 선택값 기준"
+    description: "머리 사이즈 직접 선택"
   };
 }
 

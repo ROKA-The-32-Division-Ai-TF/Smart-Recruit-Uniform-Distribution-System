@@ -57,27 +57,9 @@ function renderInput(message = "") {
               <em>kg</em>
             </div>
           </label>
-          <label class="profile-field">
-            <span>발</span>
-            <div class="field-input-wrap">
-              <select name="footSize" aria-label="발 사이즈">
-                ${renderFootSizeOptions(state.profile?.footSize)}
-              </select>
-              <em>mm</em>
-            </div>
-          </label>
-          <label class="profile-field">
-            <span>머리</span>
-            <div class="field-input-wrap">
-              <select name="headSize" aria-label="머리둘레">
-                ${renderHeadSizeOptions(state.profile?.headSize)}
-              </select>
-              <em>호</em>
-            </div>
-          </label>
         </div>
         <div class="input-line"></div>
-        <p class="input-note">의류는 자동 추천하고, 신발과 모자는 선택한 실측값을 반영합니다.</p>
+        <p class="input-note">의류는 백룡AI가 추천하고, 신발과 모자는 해당 품목에서 직접 선택합니다.</p>
         <button class="primary-button" type="submit">추천 사이즈 보기</button>
         <p id="formMessage" class="form-message">${esc(message)}</p>
       </form>
@@ -91,38 +73,15 @@ function renderInput(message = "") {
   bindRecommendationControls();
 }
 
-function renderFootSizeOptions(selectedValue) {
-  const selected = String(selectedValue || "");
-  const values = [];
-  for (let size = 240; size <= 320; size += 5) values.push(size);
-  return [
-    `<option value="">선택</option>`,
-    ...values.map((size) => `<option value="${size}" ${selected === String(size) ? "selected" : ""}>${size}</option>`)
-  ].join("");
-}
-
-function renderHeadSizeOptions(selectedValue) {
-  const selected = String(selectedValue || "");
-  const values = [];
-  for (let size = 52; size <= 62; size += 1) values.push(size);
-  return [
-    `<option value="">선택</option>`,
-    ...values.map((size) => `<option value="${size}" ${selected === String(size) ? "selected" : ""}>${size}</option>`)
-  ].join("");
-}
-
 async function handleProfileSubmit(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const raw = {
     recruitNo: form.get("recruitNo"),
     height: form.get("height"),
-    weight: form.get("weight"),
-    footSize: form.get("footSize"),
-    headSize: form.get("headSize")
+    weight: form.get("weight")
   };
-  const currentRoundItems = getRoundItems(state.config, getSelectedRound());
-  const errors = validateProfileInput(raw, currentRoundItems);
+  const errors = validateProfileInput(raw);
   if (errors.length) {
     document.querySelector("#formMessage").textContent = errors[0];
     return;
@@ -130,14 +89,19 @@ async function handleProfileSubmit(event) {
 
   state.profile = buildProfile(raw);
   state.round = getSelectedRound();
+  showRecommendationLoading(true);
   try {
-    state.status = await state.api.getStatus(state.profile.recruitNo);
+    const [status] = await Promise.all([
+      state.api.getStatus(state.profile.recruitNo),
+      wait(650)
+    ]);
+    state.status = status;
     const routing = syncRoundWithStatus();
     if (routing.allDone) {
       renderDone("모든 불출 차수가 완료되었습니다.", state.status.records || []);
       return;
     }
-    const routedErrors = validateProfileInput(raw, getRoundItems(state.config, state.round));
+    const routedErrors = validateProfileInput(raw);
     if (routedErrors.length) {
       renderInput(routedErrors[0]);
       return;
@@ -147,8 +111,11 @@ async function handleProfileSubmit(event) {
       ? `기록 기준으로 ${state.round.label} 추천 사이즈를 표시했습니다.`
       : `${state.round.label} 추천 사이즈를 표시했습니다.`);
   } catch (error) {
+    await wait(350);
     refreshIssueItems();
     renderInput(error.message || `${state.round.label} 추천 사이즈를 표시했습니다.`);
+  } finally {
+    showRecommendationLoading(false);
   }
 }
 
@@ -219,26 +186,25 @@ function renderRecommendationPanel(round) {
 
 function renderProfileMeta() {
   const parts = [
-    `교번 ${state.profile.recruitNo}`,
     `${state.profile.height}cm`,
     `${state.profile.weight}kg`
   ];
-  if (Number.isFinite(state.profile.footSize)) parts.push(`발 ${state.profile.footSize}mm`);
-  if (Number.isFinite(state.profile.headSize)) parts.push(`머리 ${state.profile.headSize}호`);
   return esc(parts.join(" · "));
 }
 
 function renderSizeCard(item) {
   const recommendation = item.recommendation;
+  const direct = isDirectSelectionItem(item);
+  const hasSelection = Boolean(item.finalSize);
   return `
     <button class="size-card" data-detail-item="${esc(item.itemId)}" type="button">
       <div class="card-body">
         <div class="card-title-row">
           <h2>${esc(item.label)}</h2>
-          <span>${item.finalSize !== recommendation.recommendedSize ? "교체됨" : recommendation.inputMode === "direct" ? "선택" : "추천"}</span>
+          <span>${direct ? hasSelection ? "선택완료" : "직접선택" : item.finalSize !== recommendation.recommendedSize ? "교체됨" : "추천"}</span>
         </div>
-        <p>${item.finalSize !== recommendation.recommendedSize ? "최종 선택 사이즈" : recommendation.inputMode === "direct" ? "실측 선택 사이즈" : "백룡AI 추천 사이즈"}</p>
-        <strong class="card-size">${esc(item.finalSize)}</strong>
+        <p>${direct ? hasSelection ? "신청 사이즈" : "상세보기에서 선택" : item.finalSize !== recommendation.recommendedSize ? "최종 선택 사이즈" : "백룡AI 추천 사이즈"}</p>
+        <strong class="card-size ${hasSelection ? "" : "needs-choice"}">${esc(hasSelection ? item.finalSize : "선택 필요")}</strong>
       </div>
     </button>
   `;
@@ -297,9 +263,7 @@ function bindRecommendationControls() {
     button.addEventListener("click", () => {
       const item = state.issueItems.find((candidate) => candidate.itemId === button.dataset.itemId);
       if (!item) return;
-      item.finalSize = button.dataset.cardSize;
-      item.changed = item.finalSize !== item.recommendation.recommendedSize;
-      item.changeReason = item.changed ? "현장 교체" : "";
+      applyItemSize(item, button.dataset.cardSize);
       renderInput("선택한 사이즈를 반영했습니다.");
     });
   });
@@ -313,6 +277,7 @@ function roundThemeClass(round) {
 function renderItem() {
   const item = state.issueItems[state.itemIndex];
   const recommendation = item.recommendation;
+  const direct = isDirectSelectionItem(item);
   app.className = "app-shell item-shell";
   app.innerHTML = `
     <section class="item-screen">
@@ -324,12 +289,12 @@ function renderItem() {
       </div>
       <h1>${esc(item.label)}</h1>
       ${renderItemVisual(item)}
-      <div class="recommend-copy">백룡AI가 추천하는 사이즈는</div>
-      <div class="recommend-size">${esc(item.finalSize)}</div>
+      <div class="recommend-copy">${direct ? "직접 선택할 사이즈는" : "백룡AI가 추천하는 사이즈는"}</div>
+      <div class="recommend-size ${item.finalSize ? "" : "empty"}">${esc(item.finalSize || "선택")}</div>
       ${renderDetailSizeStack(item)}
-      <p class="algorithm-note">${esc(recommendation.targetDescription)} · BMI ${recommendation.bmi} (${esc(recommendation.bmiLabel)})</p>
+      <p class="algorithm-note">${direct ? "AI 추천 없이 본인 실측 또는 착용 기준으로 선택합니다." : `${esc(recommendation.targetDescription)} · BMI ${recommendation.bmi} (${esc(recommendation.bmiLabel)})`}</p>
       <div class="mobile-actions">
-        <button id="changeSize" class="primary-button" type="button">사이즈 교체</button>
+        <button id="changeSize" class="primary-button" type="button">${direct ? "사이즈 선택" : "사이즈 교체"}</button>
         <div class="action-row">
           <button id="prevItem" class="secondary-button" type="button" ${state.itemIndex === 0 ? "disabled" : ""}>이전</button>
           <button id="nextItem" class="secondary-button strong" type="button">${state.itemIndex === state.issueItems.length - 1 ? "최종 확인" : "다음"}</button>
@@ -342,9 +307,7 @@ function renderItem() {
   document.querySelector("#changeSize").addEventListener("click", () => openSizeSheet(item, "detail"));
   document.querySelectorAll("[data-detail-size]").forEach((button) => {
     button.addEventListener("click", () => {
-      item.finalSize = button.dataset.detailSize;
-      item.changed = item.finalSize !== item.recommendation.recommendedSize;
-      item.changeReason = item.changed ? "현장 교체" : "";
+      applyItemSize(item, button.dataset.detailSize);
       renderItem();
     });
   });
@@ -365,6 +328,8 @@ function renderItem() {
 }
 
 function renderDetailSizeStack(item) {
+  if (isDirectSelectionItem(item)) return renderDirectSizeGrid(item);
+
   const headers = item.recommendation.tableHeaders;
   const rows = [...item.recommendation.alternatives];
   if (!rows.some((row) => row.size === item.finalSize)) {
@@ -392,6 +357,18 @@ function renderDetailSizeStack(item) {
   `;
 }
 
+function renderDirectSizeGrid(item) {
+  return `
+    <section class="direct-size-grid" aria-label="${esc(item.label)} 직접 선택">
+      ${(item.sizes || []).map((size) => `
+        <button class="${String(size) === String(item.finalSize) ? "selected" : ""}" data-detail-size="${esc(size)}" type="button">
+          ${esc(size)}
+        </button>
+      `).join("")}
+    </section>
+  `;
+}
+
 function displayRelation(relation) {
   if (relation === "한 치수 낮음") return "한 치수 작게";
   if (relation === "한 치수 큼") return "한 치수 크게";
@@ -411,16 +388,17 @@ function renderReview(message = "") {
             (item) => `
               <div class="review-row">
                 <span>${esc(item.label)}</span>
-                <strong>${esc(item.finalSize)}</strong>
-                ${item.finalSize !== item.recommendation.recommendedSize ? "<em>교체</em>" : "<em>추천</em>"}
+                <strong>${esc(item.finalSize || "선택 필요")}</strong>
+                ${isDirectSelectionItem(item) ? "<em>선택</em>" : item.finalSize !== item.recommendation.recommendedSize ? "<em>교체</em>" : "<em>추천</em>"}
               </div>
             `
           )
           .join("")}
       </div>
-      <p class="review-meta">${renderProfileMeta()}</p>
-      <button id="submitIssue" class="primary-button" type="button">최종 확정</button>
-      <button id="backToItems" class="ghost-button" type="button">품목 다시 확인</button>
+      <div class="review-actions">
+        <button id="submitIssue" class="primary-button" type="button">최종 확정</button>
+        <button id="backToItems" class="ghost-button" type="button">품목 다시 확인</button>
+      </div>
       <p id="submitMessage" class="form-message">${esc(message)}</p>
     </section>
   `;
@@ -434,6 +412,12 @@ function renderReview(message = "") {
 
 function openSubmitConfirm() {
   if (document.querySelector(".confirm-sheet")) return;
+  const missing = findMissingSelections();
+  if (missing) {
+    state.itemIndex = state.issueItems.findIndex((item) => item.itemId === missing.itemId);
+    renderInput(`${missing.label} 사이즈를 먼저 선택해 주세요.`);
+    return;
+  }
   const sheet = document.createElement("div");
   sheet.className = "confirm-sheet";
   sheet.innerHTML = `
@@ -444,7 +428,7 @@ function openSubmitConfirm() {
         ${state.issueItems.map((item) => `
           <span>
             <b>${esc(item.label)}</b>
-            <strong>${esc(item.finalSize)}</strong>
+            <strong>${esc(item.finalSize || "-")}</strong>
           </span>
         `).join("")}
       </div>
@@ -466,6 +450,12 @@ function openSubmitConfirm() {
 }
 
 async function submitIssue() {
+  const missing = findMissingSelections();
+  if (missing) {
+    state.itemIndex = state.issueItems.findIndex((item) => item.itemId === missing.itemId);
+    renderInput(`${missing.label} 사이즈를 먼저 선택해 주세요.`);
+    return;
+  }
   setBusy(true, "불출 내역을 저장하고 있습니다.");
   try {
     state.status = await state.api.getStatus(state.profile.recruitNo);
@@ -558,7 +548,7 @@ function openSizeSheet(item, returnTo = "summary") {
   sheet.innerHTML = `
     <div class="sheet-panel">
       <div class="sheet-handle"></div>
-      <h2>${esc(item.label)} 사이즈 교체</h2>
+      <h2>${esc(item.label)} 사이즈 ${isDirectSelectionItem(item) ? "선택" : "교체"}</h2>
       <div class="size-options">
         ${(item.sizes || [])
           .map(
@@ -574,9 +564,7 @@ function openSizeSheet(item, returnTo = "summary") {
   document.body.appendChild(sheet);
   sheet.querySelectorAll("[data-size]").forEach((button) => {
     button.addEventListener("click", () => {
-      item.finalSize = button.dataset.size;
-      item.changed = item.finalSize !== item.recommendation.recommendedSize;
-      item.changeReason = item.changed ? "현장 교체" : "";
+      applyItemSize(item, button.dataset.size);
       sheet.remove();
       if (returnTo === "detail") {
         renderItem();
@@ -586,6 +574,49 @@ function openSizeSheet(item, returnTo = "summary") {
     });
   });
   sheet.querySelector("[data-close]").addEventListener("click", () => sheet.remove());
+}
+
+function isDirectSelectionItem(item) {
+  return item?.recommendation?.inputMode === "direct";
+}
+
+function applyItemSize(item, size) {
+  item.finalSize = String(size);
+  if (isDirectSelectionItem(item) && !item.recommendation.recommendedSize) {
+    item.changed = false;
+    item.changeReason = "직접 선택";
+    return;
+  }
+  item.changed = item.finalSize !== item.recommendation.recommendedSize;
+  item.changeReason = item.changed ? "현장 교체" : "";
+}
+
+function findMissingSelections() {
+  return state.issueItems.find((item) => isDirectSelectionItem(item) && !item.finalSize);
+}
+
+function showRecommendationLoading(show) {
+  document.querySelector(".recommend-loading-overlay")?.remove();
+  const form = document.querySelector("#profileForm");
+  const submit = form?.querySelector('button[type="submit"]');
+  if (submit) submit.disabled = show;
+  if (!show) return;
+  const overlay = document.createElement("div");
+  overlay.className = "recommend-loading-overlay";
+  overlay.setAttribute("role", "status");
+  overlay.setAttribute("aria-live", "polite");
+  overlay.innerHTML = `
+    <div class="recommend-loading-card">
+      <div class="loading-mark"></div>
+      <strong>백룡 AI가 추천중</strong>
+      <span>잠시만 기다려 주세요.</span>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function renderSlimBrand() {

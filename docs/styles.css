@@ -41,11 +41,15 @@ button:disabled {
 
 .mobile-body {
   min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
   background: var(--gradient);
 }
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
 }
 
 .theme-round-one {
@@ -78,6 +82,8 @@ button:disabled {
 
 .loading-screen {
   min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   align-content: center;
@@ -105,6 +111,8 @@ button:disabled {
 
 .input-screen {
   min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
   display: grid;
   grid-template-rows: auto auto auto 1fr;
   gap: 18px;
@@ -193,7 +201,7 @@ button:disabled {
 
 .input-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   min-height: 158px;
   padding: 22px 16px 16px;
@@ -538,6 +546,11 @@ button:disabled {
   white-space: nowrap;
 }
 
+.card-size.needs-choice {
+  font-size: clamp(1.15rem, 5vw, 1.5rem);
+  color: #9aa3b5;
+}
+
 .card-body em {
   justify-self: start;
   padding: 6px 10px;
@@ -594,7 +607,42 @@ button:disabled {
 }
 
 .confirm-all {
-  margin-top: 4px;
+  margin-top: 12px;
+}
+
+.recommend-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: max(22px, env(safe-area-inset-top)) 22px max(22px, env(safe-area-inset-bottom));
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(4px);
+}
+
+.recommend-loading-card {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  width: min(340px, 88vw);
+  padding: 26px 22px;
+  border-radius: 26px;
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.24);
+  text-align: center;
+}
+
+.recommend-loading-card strong {
+  color: var(--accent-deep);
+  font-size: 1.45rem;
+  font-weight: 950;
+}
+
+.recommend-loading-card span {
+  color: var(--muted);
+  font-weight: 900;
 }
 
 .confirm-sheet {
@@ -669,6 +717,8 @@ button:disabled {
 .review-screen,
 .done-screen {
   min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
   width: min(1080px, 100%);
   margin: 0 auto;
   padding: max(24px, env(safe-area-inset-top)) 28px max(24px, env(safe-area-inset-bottom));
@@ -783,10 +833,39 @@ button:disabled {
   line-height: 1;
 }
 
+.recommend-size.empty {
+  color: #97a0b2;
+  font-size: 3.2rem;
+}
+
 .detail-size-stack {
   display: grid;
   gap: 8px;
   margin: 0 0 14px;
+}
+
+.direct-size-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.direct-size-grid button {
+  min-height: 56px;
+  border: 2px solid #dfe7fa;
+  border-radius: 16px;
+  color: var(--blue);
+  background: #ffffff;
+  font-weight: 950;
+  box-shadow: 0 8px 20px rgba(17, 24, 39, 0.04);
+}
+
+.direct-size-grid button.selected {
+  color: #ffffff;
+  border-color: var(--blue);
+  background: var(--blue);
+  box-shadow: 0 14px 28px rgba(41, 79, 174, 0.2);
 }
 
 .detail-size-option {
@@ -949,6 +1028,12 @@ button:disabled {
   color: var(--muted);
   text-align: center;
   font-weight: 850;
+}
+
+.review-actions {
+  display: grid;
+  gap: 16px;
+  margin: 24px 0 8px;
 }
 
 .receipt-card h2 {
@@ -1899,7 +1984,7 @@ button:disabled {
 
 @media (min-width: 861px) {
   .admin-body:has(.desktop-dashboard) {
-    background: #242424;
+    background: linear-gradient(120deg, #e8fff0 0%, #eaf3ff 52%, #fff5fb 100%);
   }
 }
 
@@ -1915,10 +2000,10 @@ button:disabled {
   position: relative;
   display: block;
   height: calc(100vh - 44px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(215, 230, 251, 0.92);
   border-radius: 24px;
-  background: #05030c;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.42);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(241, 247, 255, 0.92));
+  box-shadow: 0 30px 80px rgba(41, 79, 174, 0.16);
   overflow: hidden;
 }
 
@@ -1927,8 +2012,8 @@ button:disabled {
   min-width: 0;
   height: 100%;
   padding: 18px;
-  color: #ffffff;
-  background: #05030c;
+  color: #1d2a44;
+  background: linear-gradient(135deg, #f7fbff 0%, #eef8ff 48%, #f6fff5 100%);
   overflow: auto;
 }
 
@@ -1943,9 +2028,10 @@ button:disabled {
   align-items: center;
   margin-bottom: 14px;
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(215, 230, 251, 0.9);
   border-radius: 20px;
-  background: #111116;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 18px 40px rgba(41, 79, 174, 0.08);
 }
 
 .dashboard-header-brand {
@@ -1967,7 +2053,7 @@ button:disabled {
   flex: 0 0 auto;
   width: 42px;
   height: 50px;
-  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.28));
+  filter: drop-shadow(0 8px 16px rgba(41, 79, 174, 0.18));
 }
 
 .dashboard-header-brand div {
@@ -1977,14 +2063,14 @@ button:disabled {
 }
 
 .dashboard-header-brand strong {
-  color: #ffffff;
+  color: var(--blue-dark);
   font-size: 1rem;
   font-weight: 950;
   white-space: nowrap;
 }
 
 .dashboard-header-brand span {
-  color: #8d8996;
+  color: #637088;
   font-size: 0.82rem;
   font-weight: 850;
   white-space: nowrap;
@@ -1997,7 +2083,7 @@ button:disabled {
   min-height: 48px;
   padding: 5px;
   border-radius: 16px;
-  background: #05050a;
+  background: #edf5ff;
 }
 
 .desktop-nav button {
@@ -2005,7 +2091,7 @@ button:disabled {
   border: 0;
   border-radius: 12px;
   padding: 0 12px;
-  color: #aaa6b3;
+  color: #637088;
   background: transparent;
   font-size: 0.94rem;
   font-weight: 950;
@@ -2013,8 +2099,9 @@ button:disabled {
 }
 
 .desktop-nav button.active {
-  color: #111111;
-  background: #f4f1ff;
+  color: #ffffff;
+  background: var(--blue);
+  box-shadow: 0 10px 22px rgba(41, 79, 174, 0.18);
 }
 
 .dashboard-actions {
@@ -2028,14 +2115,16 @@ button:disabled {
   border: 0;
   border-radius: 13px;
   padding: 0 18px;
-  color: #111111;
-  background: #f4f1ff;
+  color: var(--blue-dark);
+  background: #ffffff;
+  border: 1px solid #d8e5fb;
   font-weight: 950;
 }
 
 .dashboard-actions #downloadCsv {
-  color: #f4f1ff;
-  background: #191622;
+  color: #ffffff;
+  background: var(--blue);
+  border-color: var(--blue);
 }
 
 .dashboard-hero {
@@ -2048,14 +2137,14 @@ button:disabled {
 
 .dashboard-hero h1 {
   margin: 0 0 8px;
-  color: #ffffff;
+  color: var(--blue-dark);
   font-size: clamp(1.55rem, 2.3vw, 2.15rem);
   line-height: 1.05;
 }
 
 .dashboard-hero p {
   margin: 0;
-  color: #aaa6b3;
+  color: #637088;
   font-weight: 800;
 }
 
@@ -2065,8 +2154,8 @@ button:disabled {
   min-height: 44px;
   padding: 0 18px;
   border-radius: 999px;
-  color: #ffffff;
-  background: #191622;
+  color: var(--blue);
+  background: #eaf2ff;
   font-weight: 950;
 }
 
@@ -2080,10 +2169,10 @@ button:disabled {
 .kpi-card,
 .dashboard-panel,
 .desktop-dashboard .admin-section {
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid #d8e5fb;
   border-radius: 22px;
-  background: #1d1d1c;
-  box-shadow: 0 22px 46px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 22px 46px rgba(41, 79, 174, 0.1);
 }
 
 .kpi-card {
@@ -2094,40 +2183,40 @@ button:disabled {
 }
 
 .kpi-card.primary {
-  color: #111111;
-  background: #f4f1ff;
+  color: var(--blue-dark);
+  background: linear-gradient(135deg, #ffffff 0%, #e8f0ff 100%);
 }
 
 .kpi-card.success {
-  background: #19251f;
+  background: linear-gradient(135deg, #ffffff 0%, #eaffef 100%);
 }
 
 .kpi-card.danger {
-  background: #251919;
+  background: linear-gradient(135deg, #ffffff 0%, #fff0f3 100%);
 }
 
 .kpi-card span,
 .kpi-card p {
   margin: 0;
-  color: #a9a5b1;
+  color: #637088;
   font-weight: 850;
 }
 
 .kpi-card.primary span,
 .kpi-card.primary p {
-  color: #5c5965;
+  color: #637088;
 }
 
 .kpi-card strong {
   display: block;
   margin: 14px 0 8px;
-  color: #ffffff;
+  color: var(--blue-dark);
   font-size: clamp(1.55rem, 2.1vw, 2.12rem);
   line-height: 1;
 }
 
 .kpi-card.primary strong {
-  color: #111111;
+  color: var(--blue);
 }
 
 .chart-panel {
@@ -2154,12 +2243,12 @@ button:disabled {
 
 .panel-title h2 {
   margin: 0;
-  color: #ffffff;
+  color: var(--blue-dark);
   font-size: 1.25rem;
 }
 
 .panel-title span {
-  color: #807b89;
+  color: #6b778f;
   font-size: 0.86rem;
   font-weight: 900;
 }
@@ -2171,7 +2260,7 @@ button:disabled {
   gap: 12px;
   height: min(23vh, 215px);
   padding: 16px 4px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #d8e5fb;
 }
 
 .bar-item {
@@ -2188,8 +2277,8 @@ button:disabled {
   justify-self: center;
   padding: 5px 7px;
   border-radius: 999px;
-  color: #ffffff;
-  background: rgba(0, 0, 0, 0.36);
+  color: var(--blue-dark);
+  background: #edf5ff;
   font-size: 0.72rem;
   font-weight: 950;
 }
@@ -2199,11 +2288,11 @@ button:disabled {
   width: 100%;
   min-height: 18px;
   border-radius: 12px 12px 4px 4px;
-  background: linear-gradient(180deg, #7897ff 0%, #5e80ef 100%);
+  background: linear-gradient(180deg, #6c93ff 0%, #2f58c8 100%);
 }
 
 .bar-item em {
-  color: #8d8996;
+  color: #637088;
   font-size: 0.76rem;
   font-style: normal;
   font-weight: 900;
@@ -2214,7 +2303,7 @@ button:disabled {
   display: grid;
   place-items: center;
   min-height: 178px;
-  color: #8d8996;
+  color: #637088;
   font-weight: 900;
 }
 
@@ -2229,18 +2318,19 @@ button:disabled {
   min-height: 82px;
   padding: 16px;
   border-radius: 18px;
-  background: #111116;
+  border: 1px solid #d8e5fb;
+  background: #f7fbff;
 }
 
 .round-mini-list span,
 .round-mini-list p {
   margin: 0;
-  color: #8d8996;
+  color: #637088;
   font-weight: 900;
 }
 
 .round-mini-list strong {
-  color: #ffffff;
+  color: var(--blue);
   font-size: 1.9rem;
   line-height: 1;
 }
@@ -2266,7 +2356,7 @@ button:disabled {
   position: absolute;
   inset: 38px;
   border-radius: 50%;
-  background: #1d1d1c;
+  background: #ffffff;
 }
 
 .donut-legend {
@@ -2280,7 +2370,7 @@ button:disabled {
   gap: 8px;
   align-items: center;
   min-width: 0;
-  color: #d8d5df;
+  color: #33415c;
   font-size: 0.85rem;
   font-weight: 850;
 }
@@ -2292,7 +2382,7 @@ button:disabled {
 }
 
 .donut-legend b {
-  color: #ffffff;
+  color: var(--blue-dark);
 }
 
 .desktop-dashboard .admin-section {
@@ -2310,13 +2400,13 @@ button:disabled {
 
 .desktop-view-head h1 {
   margin: 0 0 8px;
-  color: #ffffff;
+  color: var(--blue-dark);
   font-size: clamp(2rem, 4vw, 3rem);
 }
 
 .desktop-view-head p {
   margin: 0;
-  color: #aaa6b3;
+  color: #637088;
   font-weight: 850;
 }
 
@@ -2324,17 +2414,17 @@ button:disabled {
   display: grid;
   gap: 8px;
   min-width: 210px;
-  color: #aaa6b3;
+  color: #637088;
   font-weight: 900;
 }
 
 .date-filter select {
   min-height: 48px;
-  border: 1px solid #302d3b;
+  border: 1px solid #d8e5fb;
   border-radius: 14px;
   padding: 0 14px;
-  color: #ffffff;
-  background: #15111d;
+  color: var(--blue-dark);
+  background: #ffffff;
   font: inherit;
   font-weight: 900;
 }
@@ -2347,9 +2437,10 @@ button:disabled {
 
 .issue-accordion {
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid #d8e5fb;
   border-radius: 22px;
-  background: #1d1d1c;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 36px rgba(41, 79, 174, 0.08);
 }
 
 .issue-accordion-toggle {
@@ -2361,7 +2452,7 @@ button:disabled {
   min-height: 78px;
   border: 0;
   padding: 18px 20px;
-  color: #ffffff;
+  color: var(--blue-dark);
   background: transparent;
   text-align: left;
 }
@@ -2376,7 +2467,7 @@ button:disabled {
 }
 
 .issue-accordion-toggle small {
-  color: #8d8996;
+  color: #637088;
   font-size: 0.9rem;
   font-weight: 850;
 }
@@ -2387,26 +2478,26 @@ button:disabled {
   min-width: 64px;
   min-height: 40px;
   border-radius: 999px;
-  color: #111111;
-  background: #f4f1ff;
+  color: #ffffff;
+  background: var(--blue);
 }
 
 .issue-accordion-body .admin-section {
   margin: 0;
   border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid #d8e5fb;
   border-radius: 0;
   box-shadow: none;
 }
 
 .desktop-dashboard .section-head {
-  border-bottom-color: rgba(255, 255, 255, 0.08);
+  border-bottom-color: #d8e5fb;
 }
 
 .desktop-dashboard .section-head h2,
 .desktop-dashboard .sizes-editor-head h3,
 .desktop-dashboard .round-editor-head h3 {
-  color: #ffffff;
+  color: var(--blue-dark);
 }
 
 .desktop-dashboard .section-head p,
@@ -2419,7 +2510,7 @@ button:disabled {
 .desktop-dashboard .round-editor-head p,
 .desktop-dashboard .round-entry label,
 .desktop-dashboard .round-entry label span {
-  color: #8d8996;
+  color: #637088;
 }
 
 .desktop-dashboard .daily-list {
@@ -2433,14 +2524,14 @@ button:disabled {
 .desktop-dashboard .config-item,
 .desktop-dashboard .image-uploader,
 .desktop-dashboard .sizes-editor {
-  border-color: rgba(255, 255, 255, 0.07);
-  background: #111116;
+  border-color: #d8e5fb;
+  background: #f8fbff;
 }
 
 .desktop-dashboard .round-entry input {
-  border-color: #353241;
-  color: #f4f1ff;
-  background: #181722;
+  border-color: #d8e5fb;
+  color: var(--blue-dark);
+  background: #ffffff;
 }
 
 .config-item {
@@ -2456,7 +2547,7 @@ button:disabled {
   min-height: 76px;
   border: 0;
   padding: 18px;
-  color: #ffffff;
+  color: var(--blue-dark);
   background: transparent;
   text-align: left;
 }
@@ -2471,7 +2562,7 @@ button:disabled {
 }
 
 .config-item-toggle small {
-  color: #8d8996;
+  color: #637088;
   font-size: 0.88rem;
   font-weight: 850;
 }
@@ -2482,8 +2573,8 @@ button:disabled {
   min-width: 64px;
   min-height: 40px;
   border-radius: 999px;
-  color: #111111;
-  background: #f4f1ff;
+  color: #ffffff;
+  background: var(--blue);
 }
 
 .config-item-body {
@@ -2500,72 +2591,72 @@ button:disabled {
 .desktop-dashboard .daily-card strong,
 .desktop-dashboard .daily-card b,
 .desktop-dashboard .config-notice {
-  color: #86a1ff;
+  color: var(--blue);
 }
 
 .desktop-dashboard .admin-table th,
 .desktop-dashboard .admin-table td {
-  border-bottom-color: rgba(255, 255, 255, 0.08);
+  border-bottom-color: #e4ecfb;
 }
 
 .desktop-dashboard .admin-table th {
-  color: #d8d5df;
-  background: #18181c;
+  color: var(--blue-dark);
+  background: #edf5ff;
 }
 
 .desktop-dashboard .admin-table td {
-  color: #efedf6;
-  background: #121216;
+  color: #273449;
+  background: #ffffff;
 }
 
 .desktop-dashboard .admin-table tr:hover td {
-  background: #181824;
+  background: #f4f8ff;
 }
 
 .desktop-dashboard .excel-filter-head button {
-  border-color: #302d3b;
-  color: #f4f1ff;
-  background: #252331;
+  border-color: #d8e5fb;
+  color: var(--blue);
+  background: #ffffff;
 }
 
 .desktop-dashboard .excel-filter-head button.active,
 .desktop-dashboard .excel-filter-actions button {
   color: #ffffff;
-  background: #6f8fff;
+  background: var(--blue);
 }
 
 .desktop-dashboard .excel-filter-menu {
-  border-color: #302d3b;
-  background: #181722;
-  box-shadow: 0 22px 42px rgba(0, 0, 0, 0.34);
+  border-color: #d8e5fb;
+  background: #ffffff;
+  box-shadow: 0 22px 42px rgba(41, 79, 174, 0.16);
 }
 
 .desktop-dashboard .excel-filter-menu input[type="search"],
 .desktop-dashboard .config-card-head input,
 .desktop-dashboard .size-entry input {
-  border-color: #302d3b;
-  color: #ffffff;
-  background: #0e0d14;
+  border-color: #d8e5fb;
+  color: var(--blue-dark);
+  background: #ffffff;
 }
 
 .desktop-dashboard .excel-filter-options label {
-  color: #efedf6;
+  color: #273449;
 }
 
 .desktop-dashboard .excel-filter-actions button + button,
 .desktop-dashboard .excel-filter-status .ghost-button {
-  color: #f4f1ff;
-  background: #292734;
+  color: var(--blue);
+  background: #eef4ff;
 }
 
 .desktop-dashboard .excel-filter-status {
-  color: #8d8996;
+  color: #637088;
 }
 
 .desktop-dashboard .secondary-button,
 .desktop-dashboard .image-file-label {
-  color: #111111;
-  background: #f4f1ff;
+  color: var(--blue);
+  background: #eef4ff;
 }
 
 .desktop-dashboard .secondary-button.strong {
@@ -2575,30 +2666,30 @@ button:disabled {
 
 .desktop-dashboard .ghost-button,
 .desktop-dashboard .clear-image {
-  border-color: #353241;
-  color: #f4f1ff;
-  background: #1c1a25;
+  border-color: #d8e5fb;
+  color: var(--blue);
+  background: #ffffff;
 }
 
 .desktop-dashboard .remove-config-item,
 .desktop-dashboard .remove-size-entry {
-  color: #ff9b9b;
-  background: #2d171b;
+  color: #b42318;
+  background: #fff0f3;
 }
 
 .desktop-dashboard .image-preview {
-  border-color: #353241;
-  background: #0e0d14;
+  border-color: #d8e5fb;
+  background: #ffffff;
 }
 
 .desktop-dashboard .round-checks {
-  border-color: rgba(255, 255, 255, 0.07);
+  border-color: #d8e5fb;
 }
 
 .desktop-dashboard .round-checks label {
-  border-color: #302d3b;
-  color: #efedf6;
-  background: #181722;
+  border-color: #d8e5fb;
+  color: #273449;
+  background: #ffffff;
 }
 
 @media (min-width: 861px) and (max-width: 1180px) {
