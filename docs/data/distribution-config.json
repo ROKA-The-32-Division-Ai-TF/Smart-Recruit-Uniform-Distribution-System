@@ -1,38 +1,52 @@
 {
-  "configVersion": "2026-05-v1",
+  "configVersion": "2026-05-16T12:38:00.782Z",
   "appName": "백룡 AI The One 스마트 신병피복불출",
   "brand": {
     "logo": "assets/brand/baekryong-new-logo.gif"
   },
   "api": {
-    "appsScriptUrl": "",
+    "appsScriptUrl": "https://script.google.com/macros/s/AKfycby8nG8gKb2TauDsXXZGbeIl_1DVMNRZ4RFX-8sXSmesBW2kk0CAFFqZ-WAOugHkOJ9U/exec",
     "localMockWhenEmpty": true,
-    "demoDataWhenEmpty": true
+    "demoDataWhenEmpty": false
   },
   "rounds": [
     {
       "roundId": "round_1",
       "label": "1차 불출",
       "order": 1,
-      "itemIds": ["combat_top", "combat_bottom", "combat_shoes"]
+      "itemIds": [
+        "combat_top",
+        "combat_bottom",
+        "combat_shoes"
+      ]
     },
     {
       "roundId": "round_2",
       "label": "2차 불출",
       "order": 2,
-      "itemIds": ["field_jacket", "field_inner"]
+      "itemIds": [
+        "field_jacket",
+        "field_inner"
+      ]
     },
     {
       "roundId": "round_3",
       "label": "3차 불출",
       "order": 3,
-      "itemIds": ["combat_shoes", "field_inner"]
+      "itemIds": [
+        "combat_shoes",
+        "field_inner"
+      ]
     },
     {
       "roundId": "round_4",
       "label": "4차 불출",
       "order": 4,
-      "itemIds": ["combat_top", "combat_bottom", "field_jacket"]
+      "itemIds": [
+        "combat_top",
+        "combat_bottom",
+        "field_jacket"
+      ]
     }
   ],
   "items": [
