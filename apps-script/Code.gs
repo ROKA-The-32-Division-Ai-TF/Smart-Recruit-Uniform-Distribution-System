@@ -143,6 +143,14 @@ function submitIssue_(payload) {
       return { ok: true, duplicate: true, records: duplicateRows };
     }
 
+    const existingRoundRows = existingRows.filter(function(row) {
+      return String(row.recruit_no) === String(payload.recruitNo) &&
+        String(row.round_id) === String(payload.roundId);
+    });
+    if (existingRoundRows.length) {
+      return { ok: true, duplicate: true, records: existingRoundRows };
+    }
+
     const timestamp = new Date().toISOString();
     const values = payload.items.map(function(item) {
       return [

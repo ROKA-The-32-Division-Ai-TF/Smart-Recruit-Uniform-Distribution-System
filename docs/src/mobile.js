@@ -91,8 +91,15 @@ async function handleProfileSubmit(event) {
   state.round = getSelectedRound();
   try {
     state.status = await state.api.getStatus(state.profile.recruitNo);
+    const routing = syncRoundWithStatus();
+    if (routing.allDone) {
+      renderDone("모든 불출 차수가 완료되었습니다.", state.status.records || []);
+      return;
+    }
     refreshIssueItems();
-    renderInput(`${state.round.label} 추천 사이즈를 표시했습니다.`);
+    renderInput(routing.switched
+      ? `기록 기준으로 ${state.round.label} 추천 사이즈를 표시했습니다.`
+      : `${state.round.label} 추천 사이즈를 표시했습니다.`);
   } catch (error) {
     refreshIssueItems();
     renderInput(error.message || `${state.round.label} 추천 사이즈를 표시했습니다.`);
@@ -101,6 +108,15 @@ async function handleProfileSubmit(event) {
 
 function getSelectedRound() {
   return state.config.rounds.find((round) => round.roundId === state.selectedRoundId) || state.config.rounds[0] || null;
+}
+
+function syncRoundWithStatus() {
+  const nextRoundId = state.status?.nextRoundId || null;
+  if (!nextRoundId) return { allDone: true, switched: false };
+  const switched = state.selectedRoundId !== nextRoundId;
+  state.selectedRoundId = nextRoundId;
+  state.round = getSelectedRound();
+  return { allDone: false, switched };
 }
 
 function refreshIssueItems() {
@@ -182,6 +198,17 @@ function bindRoundSwitch() {
   document.querySelectorAll("[data-round-id]").forEach((button) => {
     button.addEventListener("click", () => {
       if (state.selectedRoundId === button.dataset.roundId) return;
+      if (state.profile && state.status?.nextRoundId && button.dataset.roundId !== state.status.nextRoundId) {
+        const nextRound = state.config.rounds.find((round) => round.roundId === state.status.nextRoundId);
+        state.selectedRoundId = state.status.nextRoundId;
+        if (state.profile) refreshIssueItems();
+        renderInput(`기록 기준으로 ${nextRound?.label || "다음 차수"}만 확정할 수 있습니다.`);
+        return;
+      }
+      if (state.profile && state.status && !state.status.nextRoundId) {
+        renderDone("모든 불출 차수가 완료되었습니다.", state.status.records || []);
+        return;
+      }
       state.selectedRoundId = button.dataset.roundId;
       if (state.profile) refreshIssueItems();
       renderInput(state.profile ? `${getSelectedRound().label}로 전환했습니다.` : "");
@@ -383,6 +410,22 @@ function openSubmitConfirm() {
 
 async function submitIssue() {
   setBusy(true, "불출 내역을 저장하고 있습니다.");
+  try {
+    state.status = await state.api.getStatus(state.profile.recruitNo);
+    const routing = syncRoundWithStatus();
+    if (routing.allDone) {
+      renderDone("모든 불출 차수가 완료되었습니다.", state.status.records || []);
+      return;
+    }
+    if (routing.switched) {
+      refreshIssueItems();
+      renderInput(`이미 저장된 차수가 있어 ${state.round.label}로 이동했습니다.`);
+      return;
+    }
+  } catch {
+    // 저장 요청에서 네트워크 실패 처리를 이어받게 둡니다.
+  }
+
   const payload = buildSubmissionPayload({
     config: state.config,
     round: state.round,

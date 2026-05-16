@@ -310,7 +310,7 @@ function buildMobileItemOptions(summary, date) {
   return [...options.values()].sort((a, b) => {
     const aOrder = config.items.findIndex((item) => item.itemId === a.itemId);
     const bOrder = config.items.findIndex((item) => item.itemId === b.itemId);
-    return (aOrder < 0 ? 999 : aOrder) - (bOrder < 0 ? 999 : bOrder) || a.label.localeCompare(b.label, "ko");
+    return (aOrder < 0 ? 999 : aOrder) - (bOrder < 0 ? 999 : bOrder) || String(a.label).localeCompare(String(b.label), "ko");
   });
 }
 
@@ -662,11 +662,11 @@ function buildSummaryFromRecords(summary, records) {
 
     const personKey = [row.recruit_no, row.round_id].join("|");
     const person = byPerson.get(personKey) || {
-      recruitNo: row.recruit_no,
+      recruitNo: String(row.recruit_no || ""),
       height: row.height_cm,
       weight: row.weight_kg,
-      roundId: row.round_id,
-      roundName: row.round_name,
+      roundId: String(row.round_id || ""),
+      roundName: String(row.round_name || ""),
       changedCount: 0,
       items: {}
     };
@@ -678,13 +678,13 @@ function buildSummaryFromRecords(summary, records) {
   return {
     ...summary,
     sizeSummary: [...bySize.values()].sort(summarySorter),
-    personSummary: [...byPerson.values()].sort((a, b) => a.recruitNo.localeCompare(b.recruitNo, "ko") || a.roundId.localeCompare(b.roundId, "ko")),
+    personSummary: [...byPerson.values()].sort((a, b) => String(a.recruitNo).localeCompare(String(b.recruitNo), "ko") || String(a.roundId).localeCompare(String(b.roundId), "ko")),
     records
   };
 }
 
 function summarySorter(a, b) {
-  return a.roundName.localeCompare(b.roundName, "ko") || a.itemName.localeCompare(b.itemName, "ko") || String(a.size).localeCompare(String(b.size), "ko");
+  return String(a.roundName).localeCompare(String(b.roundName), "ko") || String(a.itemName).localeCompare(String(b.itemName), "ko") || String(a.size).localeCompare(String(b.size), "ko");
 }
 
 function formatDate(value) {

@@ -125,6 +125,14 @@ function mockSubmitIssue(config, payload) {
     return { ok: true, duplicate: true, records: records.filter((row) => row.submission_id === payload.submissionId) };
   }
 
+  const duplicateRoundRows = records.filter((row) =>
+    String(row.recruit_no) === String(payload.recruitNo) &&
+    String(row.round_id) === String(payload.roundId)
+  );
+  if (duplicateRoundRows.length) {
+    return { ok: true, duplicate: true, records: duplicateRoundRows };
+  }
+
   const timestamp = new Date().toISOString();
   const rows = payload.items.map((item) => ({
     submission_id: payload.submissionId,
@@ -212,13 +220,13 @@ function buildSummary(config, records) {
     },
     sizeSummary: [...bySize.values()].sort(summarySorter),
     personColumns,
-    personSummary: [...byPerson.values()].sort((a, b) => a.recruitNo.localeCompare(b.recruitNo, "ko") || a.roundId.localeCompare(b.roundId, "ko")),
+    personSummary: [...byPerson.values()].sort((a, b) => String(a.recruitNo).localeCompare(String(b.recruitNo), "ko") || String(a.roundId).localeCompare(String(b.roundId), "ko")),
     records
   };
 }
 
 function summarySorter(a, b) {
-  return a.roundName.localeCompare(b.roundName, "ko") || a.itemName.localeCompare(b.itemName, "ko") || String(a.size).localeCompare(String(b.size), "ko");
+  return String(a.roundName).localeCompare(String(b.roundName), "ko") || String(a.itemName).localeCompare(String(b.itemName), "ko") || String(a.size).localeCompare(String(b.size), "ko");
 }
 
 function savePending(payload) {

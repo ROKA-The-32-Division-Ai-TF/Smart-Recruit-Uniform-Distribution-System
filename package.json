@@ -7,6 +7,7 @@
     "serve": "python3 -m http.server 8080 --directory docs",
     "test": "node tests/recommender.test.mjs",
     "connect-api": "node scripts/connect-api.mjs",
-    "test-api": "node scripts/test-api.mjs"
+    "test-api": "node scripts/test-api.mjs",
+    "smoke-live-api": "node scripts/smoke-live-api.mjs"
   }
 }
