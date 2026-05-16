@@ -39,11 +39,23 @@ npm run serve
 3. Apps Script의 프로젝트 설정 또는 스크립트 속성에 아래 값을 설정합니다.
    - `SPREADSHEET_ID`: 저장할 Google Sheets ID
    - `ADMIN_PIN`: 관리자 화면 PIN
-4. Apps Script에서 `setup()`을 한 번 실행해 시트를 만듭니다.
+4. Apps Script에서 `setup()`을 한 번 실행해 시트를 만듭니다. 이 단계는 배포 후 `npm run test-api -- "관리자PIN"`을 실행해도 자동으로 처리됩니다.
 5. 배포 → 새 배포 → 웹 앱
    - 실행 사용자: 나
    - 액세스 권한: 링크가 있는 모든 사용자
-6. 발급된 Web App URL을 `docs/data/distribution-config.json`의 `api.appsScriptUrl`에 입력합니다.
+6. 발급된 Web App URL을 아래 명령으로 앱 설정에 반영합니다.
+
+```bash
+npm run connect-api -- "https://script.google.com/macros/s/배포ID/exec"
+```
+
+7. 관리자 PIN으로 연결과 시트 초기화를 점검합니다.
+
+```bash
+npm run test-api -- "관리자PIN"
+```
+
+`connect-api`를 실행하면 `docs/data/distribution-config.json`의 `api.appsScriptUrl`이 채워지고 테스트 더미 데이터 표시가 꺼집니다. 연결 전에는 로컬 확인용 더미 데이터가 보이고, 연결 후에는 Google Sheets 데이터를 기준으로 동작합니다.
 
 ## 데이터 저장 방식
 

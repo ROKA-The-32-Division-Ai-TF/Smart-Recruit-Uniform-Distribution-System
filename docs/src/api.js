@@ -10,6 +10,15 @@ export function createApi(config) {
 
   return {
     isLocalMock: useLocalMock,
+    appsScriptUrl,
+    async ping() {
+      if (useLocalMock) return { ok: true, mode: "local" };
+      return postAppsScript(appsScriptUrl, "ping", {});
+    },
+    async initialize(adminPin) {
+      if (useLocalMock) return { ok: true, mode: "local", initialized: true };
+      return postAppsScript(appsScriptUrl, "initialize", { adminPin });
+    },
     async getStatus(recruitNo) {
       if (useLocalMock) return mockGetStatus(config, recruitNo);
       const result = await postAppsScript(appsScriptUrl, "getStatus", {

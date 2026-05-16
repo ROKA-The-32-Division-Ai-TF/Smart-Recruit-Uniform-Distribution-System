@@ -28,6 +28,12 @@ function doPost(e) {
     const payload = JSON.parse((e.postData && e.postData.contents) || "{}");
     const action = String(payload.action || "");
 
+    if (action === "ping") {
+      return json_(ping_());
+    }
+    if (action === "initialize") {
+      return json_(initialize_(payload));
+    }
     if (action === "getStatus") {
       return json_(getStatus_(payload));
     }
@@ -50,9 +56,50 @@ function doPost(e) {
   }
 }
 
+function doGet(e) {
+  try {
+    const params = (e && e.parameter) || {};
+    const action = String(params.action || "ping");
+    if (action === "ping") {
+      return json_(ping_(), params.callback);
+    }
+    return json_({ ok: false, message: "GET은 ping만 지원합니다." }, params.callback);
+  } catch (error) {
+    return json_({ ok: false, message: error.message || String(error) });
+  }
+}
+
 function setup() {
   ensureSheets_();
   refreshSummaries_();
+}
+
+function ping_() {
+  const result = {
+    ok: true,
+    service: "Smart Recruit Uniform Distribution System",
+    spreadsheetOk: false,
+    spreadsheetName: "",
+    sheets: []
+  };
+  try {
+    const spreadsheet = getSpreadsheet_();
+    result.spreadsheetOk = true;
+    result.spreadsheetName = spreadsheet.getName();
+    result.sheets = spreadsheet.getSheets().map(function(sheet) {
+      return sheet.getName();
+    });
+  } catch (error) {
+    result.spreadsheetMessage = error.message || String(error);
+  }
+  return result;
+}
+
+function initialize_(payload) {
+  assertAdmin_(payload.adminPin);
+  ensureSheets_();
+  refreshSummaries_();
+  return Object.assign({ initialized: true }, ping_());
 }
 
 function getStatus_(payload) {
@@ -439,8 +486,14 @@ function calcBmi_(height, weight) {
   return Math.round((Number(weight) / (meters * meters)) * 10) / 10;
 }
 
-function json_(value) {
+function json_(value, callback) {
+  const text = JSON.stringify(value);
+  if (callback) {
+    return ContentService
+      .createTextOutput(String(callback) + "(" + text + ");")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
   return ContentService
-    .createTextOutput(JSON.stringify(value))
+    .createTextOutput(text)
     .setMimeType(ContentService.MimeType.JSON);
 }
