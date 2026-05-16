@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1d3f8f" />
+    <title>관리자 현황 확인</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="admin-body">
+    <main id="adminApp" class="admin-shell">
+      <section class="admin-login">
+        <img class="admin-login-logo" src="assets/brand/baekryong-new-logo.gif" alt="백룡 AI The One 스마트 신병피복불출" />
+        <h1>관리자 현황 확인</h1>
+        <label>
+          관리자 PIN
+          <input id="adminPin" type="password" inputmode="numeric" autocomplete="current-password" />
+        </label>
+        <button id="adminLogin" class="primary-button" type="button">현황 확인</button>
+        <p id="adminMessage" class="admin-message"></p>
+      </section>
+    </main>
+    <script type="module" src="src/admin.js"></script>
+  </body>
+</html>

@@ -1,0 +1,185 @@
+{
+  "configVersion": "2026-05-v1",
+  "appName": "백룡 AI The One 스마트 신병피복불출",
+  "brand": {
+    "logo": "assets/brand/baekryong-new-logo.gif"
+  },
+  "api": {
+    "appsScriptUrl": "",
+    "localMockWhenEmpty": true,
+    "demoDataWhenEmpty": true
+  },
+  "rounds": [
+    {
+      "roundId": "round_1",
+      "label": "1차 불출",
+      "order": 1,
+      "itemIds": ["combat_top", "combat_bottom", "combat_shoes"]
+    },
+    {
+      "roundId": "round_2",
+      "label": "2차 불출",
+      "order": 2,
+      "itemIds": ["field_jacket", "field_inner"]
+    },
+    {
+      "roundId": "round_3",
+      "label": "3차 불출",
+      "order": 3,
+      "itemIds": ["combat_shoes", "field_inner"]
+    },
+    {
+      "roundId": "round_4",
+      "label": "4차 불출",
+      "order": 4,
+      "itemIds": ["combat_top", "combat_bottom", "field_jacket"]
+    }
+  ],
+  "items": [
+    {
+      "itemId": "combat_top",
+      "label": "전투복 상의",
+      "recommendationType": "upper",
+      "image": "assets/mockups/combat-bottom.png",
+      "imagePosition": "center 35%",
+      "imageSize": "100% auto",
+      "order": 10,
+      "sizes": [
+        "90-168",
+        "95-168",
+        "100-168",
+        "105-168",
+        "95-173",
+        "100-173",
+        "105-173",
+        "110-173",
+        "95-178",
+        "100-178",
+        "105-178",
+        "110-178",
+        "115-178",
+        "100-185",
+        "105-185",
+        "110-185"
+      ]
+    },
+    {
+      "itemId": "combat_bottom",
+      "label": "전투복 하의",
+      "recommendationType": "lower",
+      "image": "assets/mockups/field-jacket.png",
+      "imagePosition": "center 33%",
+      "imageSize": "100% auto",
+      "order": 20,
+      "sizes": [
+        "75-168",
+        "80-168",
+        "85-168",
+        "90-168",
+        "75-173",
+        "80-173",
+        "85-173",
+        "90-173",
+        "95-173",
+        "100-173",
+        "75-178",
+        "80-178",
+        "85-178",
+        "90-178",
+        "95-178",
+        "100-178",
+        "105-178",
+        "85-185",
+        "95-185"
+      ]
+    },
+    {
+      "itemId": "combat_shoes",
+      "label": "전투화",
+      "recommendationType": "shoes",
+      "icon": "boot",
+      "order": 30,
+      "sizes": [
+        "230",
+        "235",
+        "240",
+        "245",
+        "250",
+        "255",
+        "260",
+        "265",
+        "270",
+        "275",
+        "280",
+        "285",
+        "290",
+        "295",
+        "300"
+      ]
+    },
+    {
+      "itemId": "field_jacket",
+      "label": "야전상의",
+      "recommendationType": "outer",
+      "image": "assets/mockups/field-inner.png",
+      "imagePosition": "center 34%",
+      "imageSize": "100% auto",
+      "order": 40,
+      "sizes": [
+        "90-168",
+        "95-168",
+        "100-168",
+        "105-170",
+        "90-173",
+        "95-173",
+        "100-173",
+        "105-173",
+        "115-173",
+        "100-175",
+        "110-175",
+        "120-175",
+        "95-178",
+        "100-178",
+        "95-180",
+        "100-180",
+        "115-180",
+        "130-180",
+        "110-185",
+        "140-185",
+        "150-190"
+      ]
+    },
+    {
+      "itemId": "field_inner",
+      "label": "야전내피",
+      "recommendationType": "inner",
+      "image": "assets/mockups/combat-top.png",
+      "imagePosition": "center 34%",
+      "imageSize": "100% auto",
+      "order": 50,
+      "sizes": [
+        "90-168",
+        "95-168",
+        "100-168",
+        "105-170",
+        "90-173",
+        "95-173",
+        "100-173",
+        "105-173",
+        "115-173",
+        "100-175",
+        "110-175",
+        "120-175",
+        "95-178",
+        "100-178",
+        "95-180",
+        "100-180",
+        "115-180",
+        "130-180",
+        "110-185",
+        "140-185",
+        "150-190"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "smart-recruit-uniform-distribution-system",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "python3 -m http.server 8080 --directory docs",
+    "test": "node tests/recommender.test.mjs"
+  }
+}
