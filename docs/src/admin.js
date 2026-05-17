@@ -8,8 +8,11 @@ let api;
 let currentSummary;
 let currentAdminPin = "";
 let visibleSizeSummary = [];
+let visiblePersonSummary = [];
 let sizeColumnFilters = {};
+let personColumnFilters = {};
 let currentIssueSizeRows = [];
+let currentIssuePersonRows = [];
 let currentIssueSummary = null;
 let activeDesktopView = "dashboard";
 let activeIssuePanel = "size";
@@ -60,16 +63,19 @@ async function loadSummary() {
 function renderDashboard(summary, notice = "") {
   const dailySummary = buildDailySummary(summary.records || []);
   const today = dailySummary[0] || { date: "-", peopleCount: 0, itemCount: 0, changedCount: 0, rounds: {} };
+  const issueDate = resolveIssueDate(dailySummary);
   const mobileDate = resolveMobileDate(dailySummary);
   const mobileItemOptions = buildMobileItemOptions(summary, mobileDate);
   const mobileItemId = resolveMobileItem(mobileItemOptions);
   const mobileIssueSummary = buildIssueSummary(summary, mobileDate, mobileItemId);
   const mobileMetrics = buildMobileMetrics(summary.records || [], mobileDate, mobileItemId);
   const itemShares = buildItemShares(summary.sizeSummary);
-  const issueSummary = buildIssueSummary(summary, selectedIssueDate);
+  const issueSummary = buildIssueSummary(summary, issueDate);
   currentIssueSummary = issueSummary;
   currentIssueSizeRows = issueSummary.sizeSummary;
+  currentIssuePersonRows = issueSummary.personSummary;
   visibleSizeSummary = filterSizeRows(currentIssueSizeRows);
+  visiblePersonSummary = filterPersonRows(currentIssuePersonRows);
   app.className = "admin-shell dashboard-mode";
   app.innerHTML = `
     ${renderMobileDashboard(summary, dailySummary, mobileDate, mobileItemId, mobileItemOptions, mobileIssueSummary, mobileMetrics)}
@@ -169,20 +175,92 @@ function renderDesktopOverview(summary, today, itemShares) {
 
 function renderIssueView(issueSummary, dailySummary) {
   return `
-    <section class="view-control-bar">
-      <label class="date-filter">
-        일자
-        <select id="issueDateFilter">
-          <option value="all" ${selectedIssueDate === "all" ? "selected" : ""}>전체</option>
-          ${dailySummary.map((row) => `<option value="${esc(row.date)}" ${selectedIssueDate === row.date ? "selected" : ""}>${esc(row.date)}</option>`).join("")}
-        </select>
-      </label>
+    <section class="issue-date-dashboard">
+      ${renderIssueCalendar(dailySummary, selectedIssueDate)}
+      ${renderIssueDateCard(issueSummary, selectedIssueDate)}
     </section>
-    ${renderDailySummary(dailySummary)}
     <section class="issue-accordion-list">
       ${renderIssueAccordion("size", "사이즈별 불출현황", "차수, 품목, 사이즈 기준 수량입니다.", renderSizeSummaryPanel(issueSummary))}
       ${renderIssueAccordion("person", "개인별 불출현황", "교번별 최종 불출 사이즈입니다.", renderPersonPanel(issueSummary))}
     </section>
+  `;
+}
+
+function renderIssueCalendar(dailySummary, selectedDate) {
+  const todayText = formatDate(new Date());
+  const base = parseLocalDate(selectedDate !== "all" ? selectedDate : todayText);
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+  const byDate = new Map(dailySummary.map((row) => [row.date, row]));
+  const cells = [];
+  for (let index = 0; index < monthStart.getDay(); index += 1) {
+    cells.push(`<span class="calendar-empty"></span>`);
+  }
+  for (let day = 1; day <= monthEnd.getDate(); day += 1) {
+    const date = formatDate(new Date(year, month, day));
+    const row = byDate.get(date);
+    const classes = [
+      date === selectedDate ? "selected" : "",
+      date === todayText ? "today" : "",
+      row ? "has-records" : ""
+    ].filter(Boolean).join(" ");
+    cells.push(`
+      <button class="${classes}" data-calendar-date="${esc(date)}" type="button" aria-label="${esc(formatKoreanDateLabel(date))}">
+        <span>${day}</span>
+        ${row ? `<b>${row.itemCount.toLocaleString("ko-KR")}</b>` : ""}
+      </button>
+    `);
+  }
+  return `
+    <article class="issue-calendar-card">
+      <header>
+        <div>
+          <strong>${year}년 ${month + 1}월</strong>
+          <span>오늘 ${esc(formatKoreanDateLabel(todayText))}</span>
+        </div>
+        <button data-calendar-date="${esc(todayText)}" type="button">오늘</button>
+      </header>
+      <div class="calendar-weekdays">
+        ${["일", "월", "화", "수", "목", "금", "토"].map((day) => `<span>${day}</span>`).join("")}
+      </div>
+      <div class="calendar-grid">
+        ${cells.join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderIssueDateCard(issueSummary, selectedDate) {
+  const records = issueSummary.records || [];
+  const changedCount = records.filter((row) => row.changed === "Y" || row.changed === true).length;
+  const peopleCount = new Set(records.map((row) => personIdentity(row)).filter(Boolean)).size;
+  const rate = records.length ? Number(((changedCount / records.length) * 100).toFixed(1)) : 0;
+  const roundRows = buildRoundDashboardRows(records);
+  const topItems = buildItemShares(issueSummary.sizeSummary).slice(0, 4);
+  return `
+    <article class="issue-date-card">
+      <header>
+        <div>
+          <span>선택 일자</span>
+          <strong>${esc(formatKoreanDateLabel(selectedDate))}</strong>
+        </div>
+        <b>${records.length.toLocaleString("ko-KR")}개</b>
+      </header>
+      <div class="issue-date-metrics">
+        <div><span>인원</span><strong>${peopleCount.toLocaleString("ko-KR")}명</strong></div>
+        <div><span>품목</span><strong>${records.length.toLocaleString("ko-KR")}개</strong></div>
+        <div><span>교체</span><strong>${changedCount.toLocaleString("ko-KR")}건</strong></div>
+        <div><span>교체율</span><strong>${rate}%</strong></div>
+      </div>
+      <div class="issue-date-rounds">
+        ${roundRows.map((row) => `<span>${esc(row.roundName)} <b>${row.itemCount.toLocaleString("ko-KR")}개</b></span>`).join("") || `<span>해당 날짜 기록 없음</span>`}
+      </div>
+      <div class="issue-date-items">
+        ${topItems.map((item) => `<span><i style="background:${item.color}"></i>${esc(item.label)} ${item.percent}%</span>`).join("") || `<span>품목 비중 없음</span>`}
+      </div>
+    </article>
   `;
 }
 
@@ -423,16 +501,20 @@ function bindDesktopNav() {
     button.addEventListener("click", () => {
       activeDesktopView = button.dataset.desktopNav || "dashboard";
       sizeColumnFilters = {};
+      personColumnFilters = {};
       renderDashboard(currentSummary);
     });
   });
 }
 
 function bindIssueControls() {
-  document.querySelector("#issueDateFilter")?.addEventListener("change", (event) => {
-    selectedIssueDate = event.target.value;
-    sizeColumnFilters = {};
-    renderDashboard(currentSummary);
+  document.querySelectorAll("[data-calendar-date]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedIssueDate = button.dataset.calendarDate || formatDate(new Date());
+      sizeColumnFilters = {};
+      personColumnFilters = {};
+      renderDashboard(currentSummary);
+    });
   });
   document.querySelectorAll("[data-issue-panel]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -658,6 +740,16 @@ function resolveMobileDate(dailySummary) {
   return selectedMobileDate;
 }
 
+function resolveIssueDate(dailySummary) {
+  if (!selectedIssueDate || selectedIssueDate === "all") {
+    selectedIssueDate = dailySummary[0]?.date || formatDate(new Date());
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedIssueDate)) {
+    selectedIssueDate = dailySummary[0]?.date || formatDate(new Date());
+  }
+  return selectedIssueDate;
+}
+
 function buildMobileItemOptions(summary, date) {
   const options = new Map();
   (config.items || []).forEach((item) => {
@@ -798,9 +890,17 @@ function renderLearningChart(learning) {
   const history = learning.history || [];
   if (!history.length) {
     return `
-      <div class="learning-empty">
-        <strong>아직 학습 데이터가 없습니다.</strong>
-        <span>신병이 확정한 추천/교체 결과는 Google Sheets의 ml_training 탭에 자동으로 쌓입니다.</span>
+      <div class="learning-chart placeholder">
+        <svg viewBox="0 0 100 44" preserveAspectRatio="none" role="img" aria-label="추천 기준값 기본선">
+          <polyline points="0,22 20,22 40,22 60,22 80,22 100,22" />
+          <circle cx="0" cy="22" r="1.5"></circle>
+          <circle cx="50" cy="22" r="1.5"></circle>
+          <circle cx="100" cy="22" r="1.5"></circle>
+        </svg>
+        <div class="learning-labels">
+          <span>기본 기준</span>
+          <span>a ${Number(learning.currentA || 24).toFixed(2)}</span>
+        </div>
       </div>
     `;
   }
@@ -1009,11 +1109,11 @@ function renderSizeSummaryPanel(summary) {
         <table class="admin-table excel-table" id="sizeTable">
           <thead>
             <tr>
-              ${renderExcelFilterHeader("roundName", "차수", summary.sizeSummary)}
-              ${renderExcelFilterHeader("itemName", "품목", summary.sizeSummary)}
-              ${renderExcelFilterHeader("size", "사이즈", summary.sizeSummary)}
-              ${renderExcelFilterHeader("count", "수량", summary.sizeSummary)}
-              ${renderExcelFilterHeader("changedCount", "교체", summary.sizeSummary)}
+              ${renderExcelFilterHeader("roundName", "차수", summary.sizeSummary, "size")}
+              ${renderExcelFilterHeader("itemName", "품목", summary.sizeSummary, "size")}
+              ${renderExcelFilterHeader("size", "사이즈", summary.sizeSummary, "size")}
+              ${renderExcelFilterHeader("count", "수량", summary.sizeSummary, "size")}
+              ${renderExcelFilterHeader("changedCount", "교체", summary.sizeSummary, "size")}
             </tr>
           </thead>
           <tbody id="sizeTableBody">
@@ -1033,19 +1133,23 @@ function renderPersonPanel(summary) {
   return `
     <section class="admin-section desktop-only dashboard-table-panel">
       <div class="table-wrap">
-        <table class="admin-table" id="personTable">
+        <table class="admin-table excel-table person-table" id="personTable">
           <thead>
             <tr>
-              <th>기수</th>
-              <th>교번</th>
-              <th>차수</th>
-              ${summary.personColumns.map((column) => `<th>${esc(column)}</th>`).join("")}
+              ${renderExcelFilterHeader("cohort", "기수", summary.personSummary, "person")}
+              ${renderExcelFilterHeader("recruitNo", "교번", summary.personSummary, "person")}
+              ${renderExcelFilterHeader("roundName", "차수", summary.personSummary, "person")}
+              ${summary.personColumns.map((column) => renderExcelFilterHeader(`item:${column}`, column, summary.personSummary, "person")).join("")}
             </tr>
           </thead>
-          <tbody>
-            ${summary.personSummary.map((row) => renderPersonRow(row, summary.personColumns)).join("") || `<tr><td colspan="${summary.personColumns.length + 3}">저장된 불출 내역이 없습니다.</td></tr>`}
+          <tbody id="personTableBody">
+            ${renderPersonRows(visiblePersonSummary, summary.personColumns)}
           </tbody>
         </table>
+      </div>
+      <div class="excel-filter-status">
+        <span id="personFilterCount">${visiblePersonSummary.length.toLocaleString("ko-KR")}개 항목 표시</span>
+        <button id="clearAllPersonFilters" class="ghost-button" type="button">필터 해제</button>
       </div>
     </section>
   `;
@@ -1057,44 +1161,6 @@ function formatDashboardDate(date) {
     day: "numeric",
     weekday: "short"
   }).format(date);
-}
-
-function renderDailySummary(rows) {
-  return `
-    <section class="admin-section daily-section">
-      <div class="section-head">
-        <h2>일자별 불출현황</h2>
-        <p>저장 일자 기준 최근 현황입니다.</p>
-      </div>
-      <div class="daily-list">
-        ${rows.map(renderDailyCard).join("") || `<article class="daily-card empty">저장된 불출 내역이 없습니다.</article>`}
-      </div>
-    </section>
-  `;
-}
-
-function renderDailyCard(row) {
-  const roundText = Object.entries(row.rounds)
-    .map(([roundName, count]) => `${roundName} ${count.toLocaleString("ko-KR")}개`)
-    .join(" · ") || "-";
-  return `
-    <article class="daily-card">
-      <strong>${esc(row.date)}</strong>
-      <div>
-        <span>인원</span>
-        <b>${row.peopleCount.toLocaleString("ko-KR")}명</b>
-      </div>
-      <div>
-        <span>품목</span>
-        <b>${row.itemCount.toLocaleString("ko-KR")}개</b>
-      </div>
-      <div>
-        <span>교체</span>
-        <b>${row.changedCount.toLocaleString("ko-KR")}건</b>
-      </div>
-      <p>${esc(roundText)}</p>
-    </article>
-  `;
 }
 
 function buildDailySummary(records) {
@@ -1194,19 +1260,25 @@ function formatDate(value) {
   return `${year}-${month}-${day}`;
 }
 
+function parseLocalDate(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return new Date();
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
 function formatKoreanDateLabel(value) {
   const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return String(value || "-");
   return `${Number(match[1])}년 ${Number(match[2])}월 ${Number(match[3])}일`;
 }
 
-function renderExcelFilterHeader(column, label, rows) {
-  const values = uniqueValues(rows.map((row) => filterValue(row[column])));
-  const active = hasActiveFilter(column, values);
-  const selected = sizeColumnFilters[column] || new Set(values);
+function renderExcelFilterHeader(column, label, rows, table = "size") {
+  const values = uniqueValues(rows.map((row) => getFilterCellValue(table, row, column)));
+  const active = hasActiveFilter(table, column, values);
+  const selected = getFilterState(table)[column] || new Set(values);
   return `
-    <th>
-      <div class="excel-filter" data-filter-column="${esc(column)}">
+    <th data-filter-table="${esc(table)}" data-filter-sticky="${table === "person" && (column === "cohort" || column === "recruitNo") ? "true" : "false"}">
+      <div class="excel-filter" data-filter-table="${esc(table)}" data-filter-column="${esc(column)}">
         <div class="excel-filter-head">
           <span>${esc(label)}</span>
           <button class="${active ? "active" : ""}" data-filter-toggle type="button" aria-label="${esc(label)} 필터">▼</button>
@@ -1264,6 +1336,10 @@ function bindExcelFilters() {
     sizeColumnFilters = {};
     renderDashboard(currentSummary);
   });
+  document.querySelector("#clearAllPersonFilters")?.addEventListener("click", () => {
+    personColumnFilters = {};
+    renderDashboard(currentSummary);
+  });
   document.removeEventListener("click", closeExcelFilterMenus);
   document.addEventListener("click", closeExcelFilterMenus);
 }
@@ -1275,38 +1351,68 @@ function closeExcelFilterMenus() {
 }
 
 function applyColumnFilter(filter) {
+  const table = filter.dataset.filterTable || "size";
   const column = filter.dataset.filterColumn;
-  const allValues = uniqueValues(currentIssueSizeRows.map((row) => filterValue(row[column])));
+  const sourceRows = table === "person" ? currentIssuePersonRows : currentIssueSizeRows;
+  const state = getFilterState(table);
+  const allValues = uniqueValues(sourceRows.map((row) => getFilterCellValue(table, row, column)));
   const checked = [...filter.querySelectorAll("[data-filter-option]:checked")].map((option) => option.value);
   if (checked.length === allValues.length) {
-    delete sizeColumnFilters[column];
+    delete state[column];
   } else {
-    sizeColumnFilters[column] = new Set(checked);
+    state[column] = new Set(checked);
   }
-  visibleSizeSummary = filterSizeRows(currentIssueSizeRows);
-  document.querySelector("#sizeTableBody").innerHTML = renderSizeRows(visibleSizeSummary);
-  document.querySelector("#sizeFilterCount").textContent = `${visibleSizeSummary.length.toLocaleString("ko-KR")}개 항목 표시`;
+  if (table === "person") {
+    visiblePersonSummary = filterPersonRows(currentIssuePersonRows);
+    document.querySelector("#personTableBody").innerHTML = renderPersonRows(visiblePersonSummary, currentIssueSummary?.personColumns || []);
+    document.querySelector("#personFilterCount").textContent = `${visiblePersonSummary.length.toLocaleString("ko-KR")}개 항목 표시`;
+  } else {
+    visibleSizeSummary = filterSizeRows(currentIssueSizeRows);
+    document.querySelector("#sizeTableBody").innerHTML = renderSizeRows(visibleSizeSummary);
+    document.querySelector("#sizeFilterCount").textContent = `${visibleSizeSummary.length.toLocaleString("ko-KR")}개 항목 표시`;
+  }
   updateFilterButtonStates();
 }
 
 function updateFilterButtonStates() {
   document.querySelectorAll(".excel-filter").forEach((filter) => {
+    const table = filter.dataset.filterTable || "size";
     const column = filter.dataset.filterColumn;
-    const values = uniqueValues(currentIssueSizeRows.map((row) => filterValue(row[column])));
-    filter.querySelector("[data-filter-toggle]").classList.toggle("active", hasActiveFilter(column, values));
+    const sourceRows = table === "person" ? currentIssuePersonRows : currentIssueSizeRows;
+    const values = uniqueValues(sourceRows.map((row) => getFilterCellValue(table, row, column)));
+    filter.querySelector("[data-filter-toggle]").classList.toggle("active", hasActiveFilter(table, column, values));
   });
 }
 
 function filterSizeRows(rows) {
-  return rows.filter((row) => Object.entries(sizeColumnFilters).every(([column, values]) => values.has(filterValue(row[column]))));
+  return filterRows(rows, sizeColumnFilters, "size");
+}
+
+function filterPersonRows(rows) {
+  return filterRows(rows, personColumnFilters, "person");
+}
+
+function filterRows(rows, filters, table) {
+  return rows.filter((row) => Object.entries(filters).every(([column, values]) => values.has(getFilterCellValue(table, row, column))));
+}
+
+function getFilterState(table) {
+  return table === "person" ? personColumnFilters : sizeColumnFilters;
+}
+
+function getFilterCellValue(table, row, column) {
+  if (table === "person" && String(column).startsWith("item:")) {
+    return filterValue(row.items?.[String(column).slice(5)]);
+  }
+  return filterValue(row[column]);
 }
 
 function filterValue(value) {
   return String(value ?? "-");
 }
 
-function hasActiveFilter(column, allValues) {
-  const selected = sizeColumnFilters[column];
+function hasActiveFilter(table, column, allValues) {
+  const selected = getFilterState(table)[column];
   return Boolean(selected && selected.size !== allValues.length);
 }
 
@@ -1324,6 +1430,10 @@ function renderSizeRow(row) {
       <td>${Number(row.changedCount || 0).toLocaleString("ko-KR")}</td>
     </tr>
   `;
+}
+
+function renderPersonRows(rows, columns) {
+  return rows.map((row) => renderPersonRow(row, columns)).join("") || `<tr><td colspan="${columns.length + 3}">조건에 맞는 개인 불출 내역이 없습니다.</td></tr>`;
 }
 
 function renderPersonRow(row, columns) {
