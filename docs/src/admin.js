@@ -15,7 +15,7 @@ let personColumnFilters = {};
 let currentIssueSizeRows = [];
 let currentIssuePersonRows = [];
 let currentIssueSummary = null;
-let activeDesktopView = "dashboard";
+let activeDesktopView = "issues";
 let activeIssuePanel = "size";
 let selectedIssueDate = "all";
 let visibleIssueMonth = "";
@@ -66,7 +66,6 @@ async function loadSummary() {
 
 function renderDashboard(summary, notice = "") {
   const dailySummary = buildDailySummary(summary.records || []);
-  const today = dailySummary[0] || { date: "-", peopleCount: 0, itemCount: 0, changedCount: 0, rounds: {} };
   const issueDate = resolveIssueDate(dailySummary);
   const mobileDate = resolveMobileDate(dailySummary);
   const mobileItemOptions = buildMobileItemOptions(summary, mobileDate);
@@ -93,14 +92,14 @@ function renderDashboard(summary, notice = "") {
             </div>
           </div>
           <nav class="desktop-nav" aria-label="관리자 화면 전환">
-            ${renderNavButton("dashboard", "데시보드")}
             ${renderNavButton("issues", "불출현황")}
             ${renderNavButton("settings", "품목/사이즈 설정")}
+            ${renderNavButton("dashboard", "인공지능 학습")}
             ${renderNavButton("adminSettings", "관리자 설정")}
           </nav>
           <div class="dashboard-spacer"></div>
         </header>
-        ${activeDesktopView === "dashboard" ? renderDesktopOverview(summary, today) : ""}
+        ${activeDesktopView === "dashboard" ? renderDesktopOverview(summary) : ""}
         ${activeDesktopView === "issues" ? renderIssueView(issueSummary, dailySummary) : ""}
         ${activeDesktopView === "settings" ? renderSettingsView(notice) : ""}
         ${activeDesktopView === "adminSettings" ? renderAdminSettingsView(notice) : ""}
@@ -127,14 +126,11 @@ function renderNavButton(view, label) {
   return `<button class="${activeDesktopView === view ? "active" : ""}" data-desktop-nav="${esc(view)}" type="button">${esc(label)}</button>`;
 }
 
-function renderDesktopOverview(summary, today) {
+function renderDesktopOverview(summary) {
   const learning = summary.learningSummary || { totalRows: 0, changedRows: 0, currentA: 24, history: [] };
-  const dashboardDate = today.date === "-" ? "전체" : formatKoreanDateLabel(today.date);
-  const todayRecords = today.date === "-" ? summary.records || [] : filterRecordsByDate(summary.records || [], today.date);
-  const todaySummary = buildSummaryFromRecords(summary, todayRecords);
-  const shares = buildItemShares(todaySummary.sizeSummary);
-  const exchangeInsights = buildExchangeInsights(todayRecords);
-  const roundRows = buildRoundDashboardRows(todayRecords);
+  const allRecords = summary.records || [];
+  const shares = buildItemShares(summary.sizeSummary || []);
+  const exchangeInsights = buildExchangeInsights(allRecords);
   return `
     <section class="dashboard-analytics-grid">
       <article class="dashboard-panel learning-panel">
@@ -147,7 +143,7 @@ function renderDesktopOverview(summary, today) {
       <article class="dashboard-panel share-panel">
         <div class="panel-title">
           <h2>품목별 비중</h2>
-          <span>${esc(dashboardDate)} 기준</span>
+          <span>전체 기간</span>
         </div>
         ${renderDonut(shares)}
       </article>
@@ -158,12 +154,12 @@ function renderDesktopOverview(summary, today) {
         </div>
         ${renderExchangePanel(exchangeInsights)}
       </article>
-      <article class="dashboard-panel round-panel">
+      <article class="dashboard-panel learning-graph-panel">
         <div class="panel-title">
-          <h2>차수별 불출 현황</h2>
-          <span>${esc(dashboardDate)} 기준</span>
+          <h2>학습 기준값 변화</h2>
+          <span>전체 학습 데이터</span>
         </div>
-        ${renderRoundDashboard(roundRows)}
+        ${renderLearningChart(learning, "large")}
       </article>
     </section>
   `;
@@ -312,6 +308,7 @@ function renderAdminSettingsView(notice) {
       ${renderCreatorPanel()}
       ${renderSystemFlowPanel()}
       ${renderLearningFlowPanel()}
+      ${renderResetPanel()}
     </div>
   `;
 }
@@ -386,7 +383,6 @@ function renderCohortEntry(cohort, index) {
 }
 
 function renderCreatorPanel() {
-  const creators = config.metadata?.creators?.length ? config.metadata.creators : defaultCreators();
   return `
     <section class="admin-section creator-panel">
       <div class="section-head">
@@ -397,12 +393,6 @@ function renderCreatorPanel() {
       </div>
       <div class="creator-showcase">
         <img src="${esc(CREATOR_IMAGE_SRC)}" alt="제32보병사단 AI TF 제작진" loading="lazy" />
-      </div>
-      <div class="creator-editor">
-        <label>
-          제작자 문구
-          <textarea id="creatorNames" rows="4" placeholder="예: 홍길동, 이순신">${esc(creators.join("\n"))}</textarea>
-        </label>
       </div>
     </section>
   `;
@@ -492,11 +482,19 @@ function renderLearningFlowPanel() {
   `;
 }
 
-function defaultCreators() {
-  return [
-    "제32보병사단 AI TF",
-    "대위 정동호 · 9급 전재문 · 병장 김지성 · 병장 김준우 · 상병 김민규 · 일병 임다민 · 일병 전호성"
-  ];
+function renderResetPanel() {
+  return `
+    <section class="admin-section reset-panel">
+      <div class="section-head">
+        <div>
+          <h2>전체 초기화</h2>
+          <p>불출 기록과 백룡AI 학습 데이터를 모두 비웁니다. 품목/차수 설정과 관리자 PIN은 유지됩니다.</p>
+        </div>
+        <button id="resetAllData" class="danger-button" type="button">전체 초기화</button>
+      </div>
+      <p id="resetNotice" class="config-notice"></p>
+    </section>
+  `;
 }
 
 function bindDesktopNav() {
@@ -574,8 +572,8 @@ function bindPinEditor() {
 
 function bindAdminSettingsEditor() {
   document.querySelector("#addCohort")?.addEventListener("click", addCohortEntry);
-  document.querySelector("#creatorNames")?.addEventListener("input", () => scheduleAdminSettingsSave());
   document.querySelectorAll("[data-cohort-entry]").forEach(bindCohortEntry);
+  document.querySelector("#resetAllData")?.addEventListener("click", resetAllData);
 }
 
 function addCohortEntry() {
@@ -636,15 +634,11 @@ async function saveAdminSettings({ rerender = false } = {}) {
   try {
     adminSettingsSaving = true;
     const cohorts = collectCohortsFromEditor();
-    const creators = collectCreatorsFromEditor();
     const nextConfig = {
       ...config,
       configVersion: new Date().toISOString(),
       cohorts,
-      metadata: {
-        ...(config.metadata || {}),
-        creators
-      }
+      metadata: { ...(config.metadata || {}) }
     };
     if (notice) notice.textContent = "관리자 설정을 저장하는 중입니다.";
     const result = await api.saveConfig(currentAdminPin, nextConfig);
@@ -687,11 +681,31 @@ function collectCohortsFromEditor() {
   return cohorts;
 }
 
-function collectCreatorsFromEditor() {
-  return String(document.querySelector("#creatorNames")?.value || "")
-    .split(/[\n,]/)
-    .map((name) => name.trim())
-    .filter(Boolean);
+async function resetAllData() {
+  const confirmed = window.confirm(
+    "정말 전체 초기화할까요?\n\n저장된 불출 기록, 개인별 현황, 사이즈별 현황, 백룡AI 학습 데이터가 모두 삭제됩니다.\n품목/차수 설정과 관리자 PIN은 유지됩니다."
+  );
+  if (!confirmed) return;
+  const notice = document.querySelector("#resetNotice");
+  if (notice) notice.textContent = "전체 초기화를 진행하는 중입니다.";
+  try {
+    const result = await api.resetAllData(currentAdminPin);
+    if (result.ok === false) {
+      if (notice) notice.textContent = result.message || "전체 초기화에 실패했습니다.";
+      return;
+    }
+    selectedIssueDate = "all";
+    visibleIssueMonth = "";
+    selectedMobileDate = "";
+    selectedMobileItemId = "all";
+    sizeColumnFilters = {};
+    personColumnFilters = {};
+    currentSummary = await api.adminSummary(currentAdminPin);
+    activeDesktopView = "issues";
+    renderDashboard(currentSummary, result.message || "전체 초기화가 완료되었습니다.");
+  } catch (error) {
+    if (notice) notice.textContent = error.message || "전체 초기화에 실패했습니다.";
+  }
 }
 
 function refreshCohortOrders() {
@@ -911,11 +925,12 @@ function renderMobilePersonResults(summary, query) {
   }).join("");
 }
 
-function renderLearningChart(learning) {
+function renderLearningChart(learning, variant = "") {
   const history = learning.history || [];
+  const className = `learning-chart ${variant}`.trim();
   if (!history.length) {
     return `
-      <div class="learning-chart placeholder">
+      <div class="${esc(className)} placeholder">
         <svg viewBox="0 0 100 44" preserveAspectRatio="none" role="img" aria-label="추천 기준값 기본선">
           <polyline points="0,22 20,22 40,22 60,22 80,22 100,22" />
           <circle cx="0" cy="22" r="1.5"></circle>
@@ -939,7 +954,7 @@ function renderLearningChart(learning) {
     return `${x.toFixed(2)},${y.toFixed(2)}`;
   }).join(" ");
   return `
-    <div class="learning-chart">
+    <div class="${esc(className)}">
       <svg viewBox="0 0 100 44" preserveAspectRatio="none" role="img" aria-label="추천 기준값 변화">
         <polyline points="${points}" />
         ${history.map((row, index) => {
@@ -975,9 +990,6 @@ function renderLearningTable(learning) {
           <tr><th>교체율</th><td>${rate}%</td></tr>
         </tbody>
       </table>
-      <div class="learning-chart compact">
-        ${renderLearningChart(learning)}
-      </div>
       <table class="learning-history-table">
         <thead>
           <tr>
@@ -991,8 +1003,8 @@ function renderLearningTable(learning) {
           ${history.map((row) => `
             <tr>
               <td>${esc(row.date || "-")}</td>
-              <td>${Number(row.eventCount || 0).toLocaleString("ko-KR")}</td>
-              <td>${Number(row.changedCount || 0).toLocaleString("ko-KR")}</td>
+              <td>${Number(row.eventCount ?? row.count ?? 0).toLocaleString("ko-KR")}</td>
+              <td>${Number(row.changedCount ?? row.changed ?? 0).toLocaleString("ko-KR")}</td>
               <td>${Number(row.aValue || 24).toFixed(2)}</td>
             </tr>
           `).join("") || `<tr><td colspan="4">학습 기록이 아직 없습니다.</td></tr>`}
@@ -1110,21 +1122,6 @@ function buildRoundDashboardRows(records) {
   }));
   const order = new Map((config.rounds || []).map((round, index) => [round.roundId, index]));
   return rows.sort((a, b) => (order.get(a.roundId) ?? 999) - (order.get(b.roundId) ?? 999) || String(a.roundName).localeCompare(String(b.roundName), "ko"));
-}
-
-function renderRoundDashboard(rows) {
-  const max = Math.max(...rows.map((row) => row.itemCount), 1);
-  return `
-    <div class="round-dashboard-bars">
-      ${rows.map((row) => `
-        <div class="round-dashboard-row">
-          <strong>${esc(row.roundName)}</strong>
-          <div><i style="width:${Math.max(6, (row.itemCount / max) * 100)}%"></i></div>
-          <span>${row.itemCount.toLocaleString("ko-KR")}개 · ${row.peopleCount.toLocaleString("ko-KR")}명</span>
-        </div>
-      `).join("") || `<p class="empty-chart compact-empty">해당 날짜의 불출 기록이 없습니다.</p>`}
-    </div>
-  `;
 }
 
 function renderSizeSummaryPanel(summary) {

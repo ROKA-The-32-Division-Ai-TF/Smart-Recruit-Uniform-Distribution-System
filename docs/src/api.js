@@ -57,6 +57,10 @@ export function createApi(config) {
       if (useLocalMock) return { ok: true, message: "로컬 모드에서는 PIN 변경을 저장하지 않습니다." };
       return postAppsScript(appsScriptUrl, "changeAdminPin", { adminPin: currentPin, nextPin });
     },
+    async resetAllData(adminPin) {
+      if (useLocalMock) return mockResetAllData();
+      return postAppsScript(appsScriptUrl, "resetAllData", { adminPin });
+    },
     listPending() {
       return readJson(PENDING_KEY, []);
     },
@@ -197,6 +201,13 @@ function mockAdminSummary(config, adminPin) {
     return { ok: false, message: "관리자 PIN을 입력해 주세요." };
   }
   return { ok: true, ...buildSummary(config, readRecords(config)) };
+}
+
+function mockResetAllData() {
+  writeJson(RECORDS_KEY, []);
+  writeJson("sruds_learning_v1", []);
+  writeJson(PENDING_KEY, []);
+  return { ok: true, message: "전체 초기화가 완료되었습니다." };
 }
 
 function buildSummary(config, records) {

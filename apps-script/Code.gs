@@ -74,6 +74,9 @@ function doPost(e) {
     if (action === "changeAdminPin") {
       return json_(changeAdminPin_(payload));
     }
+    if (action === "resetAllData") {
+      return json_(resetAllData_(payload));
+    }
 
     return json_({ ok: false, message: "알 수 없는 action입니다." });
   } catch (error) {
@@ -251,6 +254,21 @@ function changeAdminPin_(payload) {
   }
   PropertiesService.getScriptProperties().setProperty("ADMIN_PIN", nextPin);
   return { ok: true, message: "관리자 PIN을 변경했습니다." };
+}
+
+function resetAllData_(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    assertAdmin_(payload.adminPin);
+    ensureSheets_();
+    writeSheet_(RAW_SHEET, RAW_HEADERS, []);
+    writeSheet_(ML_SHEET, ML_HEADERS, []);
+    refreshSummaries_();
+    return { ok: true, message: "전체 초기화가 완료되었습니다." };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function assertAdmin_(adminPin) {
