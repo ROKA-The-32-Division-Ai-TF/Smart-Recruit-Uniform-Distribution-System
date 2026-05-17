@@ -5,7 +5,7 @@ const EXCHANGE_SHEET = "exchange_summary";
 const CONFIG_SHEET = "runtime_config";
 const ML_SHEET = "ml_training";
 const CONFIG_CHUNK_SIZE = 45000;
-const SCRIPT_CODE_VERSION = "2026-05-17-cohort-privacy-ml-v1";
+const SCRIPT_CODE_VERSION = "2026-05-17-admin-settings-cohort-v2";
 
 const RAW_HEADERS = [
   "submission_id",
@@ -302,8 +302,47 @@ function normalizeConfigForStorage_(config) {
   return Object.assign({}, config, {
     configVersion: String(config.configVersion || new Date().toISOString()),
     rounds: rounds,
-    items: items
+    items: items,
+    cohorts: normalizeCohortsForStorage_(config.cohorts),
+    metadata: Object.assign({}, config.metadata || {}, {
+      creators: normalizeCreatorsForStorage_(config.metadata && config.metadata.creators)
+    })
   });
+}
+
+function normalizeCohortsForStorage_(cohorts) {
+  const source = Array.isArray(cohorts) ? cohorts : [];
+  const seen = {};
+  const normalized = source.map(function(cohort, index) {
+    const rawLabel = typeof cohort === "string" ? cohort : cohort && cohort.label;
+    const label = String(rawLabel || "").trim().replace(/\s+/g, "");
+    if (!label) return null;
+    if (seen[label]) throw new Error("기수가 중복되었습니다: " + label);
+    seen[label] = true;
+    return {
+      cohortId: sanitizeConfigId_(typeof cohort === "object" && cohort ? cohort.cohortId : label) || sanitizeConfigId_(label),
+      label: label,
+      order: Number(typeof cohort === "object" && cohort ? cohort.order : index + 1) || index + 1,
+      active: typeof cohort === "object" && cohort && cohort.active === false ? false : true
+    };
+  }).filter(Boolean).sort(function(a, b) {
+    return Number(a.order || 0) - Number(b.order || 0);
+  });
+  if (!normalized.length) throw new Error("기수는 최소 1개 이상 필요합니다.");
+  return normalized;
+}
+
+function normalizeCreatorsForStorage_(creators) {
+  return (Array.isArray(creators) ? creators : [])
+    .map(function(creator) { return String(creator || "").trim(); })
+    .filter(Boolean);
+}
+
+function sanitizeConfigId_(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 function validateSubmission_(payload) {

@@ -50,6 +50,7 @@ function mergeRuntimeConfig(staticConfig, runtimeConfig) {
 export function normalizeConfig(config) {
   const rounds = [...(config.rounds || [])].sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
   const items = [...(config.items || [])].sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+  const cohorts = normalizeCohorts(config.cohorts);
   const logo = String(config.brand?.logo || "").trim();
   return {
     ...config,
@@ -59,8 +60,43 @@ export function normalizeConfig(config) {
     },
     rounds,
     items,
+    cohorts,
+    metadata: {
+      ...(config.metadata || {}),
+      creators: normalizeCreators(config.metadata?.creators)
+    },
     itemMap: Object.fromEntries(items.map((item) => [item.itemId, item]))
   };
+}
+
+export function normalizeCohorts(cohorts) {
+  return (cohorts || [])
+    .map((cohort, index) => {
+      const label = typeof cohort === "string" ? cohort : cohort?.label;
+      const normalized = String(label || "").trim().replace(/\s+/g, "");
+      if (!normalized) return null;
+      return {
+        cohortId: sanitizeConfigId(typeof cohort === "object" ? cohort.cohortId : normalized) || sanitizeConfigId(normalized),
+        label: normalized,
+        order: Number(typeof cohort === "object" ? cohort.order : index + 1) || index + 1,
+        active: typeof cohort === "object" && cohort.active === false ? false : true
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+}
+
+export function normalizeCreators(creators) {
+  return (creators || [])
+    .map((creator) => String(creator || "").trim())
+    .filter(Boolean);
+}
+
+function sanitizeConfigId(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 export function saveLocalConfigOverride(config) {

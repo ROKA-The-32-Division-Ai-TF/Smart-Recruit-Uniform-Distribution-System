@@ -4,6 +4,38 @@
   "brand": {
     "logo": "assets/brand/baekryong-new-logo.gif"
   },
+  "metadata": {
+    "creators": [
+      "제32보병사단 AI TF",
+      "백룡 AI The One"
+    ]
+  },
+  "cohorts": [
+    {
+      "cohortId": "26-1",
+      "label": "26-1기",
+      "order": 1,
+      "active": true
+    },
+    {
+      "cohortId": "26-2",
+      "label": "26-2기",
+      "order": 2,
+      "active": true
+    },
+    {
+      "cohortId": "26-3",
+      "label": "26-3기",
+      "order": 3,
+      "active": true
+    },
+    {
+      "cohortId": "26-4",
+      "label": "26-4기",
+      "order": 4,
+      "active": true
+    }
+  ],
   "api": {
     "appsScriptUrl": "https://script.google.com/macros/s/AKfycby8nG8gKb2TauDsXXZGbeIl_1DVMNRZ4RFX-8sXSmesBW2kk0CAFFqZ-WAOugHkOJ9U/exec",
     "localMockWhenEmpty": true,

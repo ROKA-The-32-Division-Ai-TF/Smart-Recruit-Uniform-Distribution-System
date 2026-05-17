@@ -37,12 +37,7 @@ function renderInput(message = "") {
       ${renderTopBar(round)}
       <form id="profileForm" class="input-card">
         <div class="input-grid">
-          <label class="profile-field">
-            <span>기수</span>
-            <div class="field-input-wrap">
-              <input name="cohort" type="text" inputmode="text" autocomplete="off" placeholder="26-1기" aria-label="기수" value="${esc(state.profile?.cohort || "")}" />
-            </div>
-          </label>
+          ${renderCohortField()}
           <label class="profile-field">
             <span>교번</span>
             <div class="field-input-wrap">
@@ -77,6 +72,36 @@ function renderInput(message = "") {
   document.querySelector("#profileForm").addEventListener("submit", handleProfileSubmit);
   bindRoundSwitch();
   bindRecommendationControls();
+}
+
+function renderCohortField() {
+  const cohorts = activeCohorts();
+  const current = state.profile?.cohort || "";
+  if (!cohorts.length) {
+    return `
+      <label class="profile-field">
+        <span>기수</span>
+        <div class="field-input-wrap">
+          <input name="cohort" type="text" inputmode="text" autocomplete="off" placeholder="26-1기" aria-label="기수" value="${esc(current)}" />
+        </div>
+      </label>
+    `;
+  }
+  return `
+    <label class="profile-field">
+      <span>기수</span>
+      <div class="field-input-wrap">
+        <select name="cohort" aria-label="기수">
+          <option value="">선택</option>
+          ${cohorts.map((cohort) => `<option value="${esc(cohort.label)}" ${cohort.label === current ? "selected" : ""}>${esc(cohort.label)}</option>`).join("")}
+        </select>
+      </div>
+    </label>
+  `;
+}
+
+function activeCohorts() {
+  return (state.config?.cohorts || []).filter((cohort) => cohort.active !== false);
 }
 
 async function handleProfileSubmit(event) {

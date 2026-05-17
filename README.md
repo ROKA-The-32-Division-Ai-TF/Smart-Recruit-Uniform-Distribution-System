@@ -6,7 +6,7 @@
 
 - `docs/` - GitHub Pages용 정적 웹앱
   - `index.html` - 신병 모바일 입력/추천/확정 화면
-  - `admin.html` - 보급대 간부용 일자별 현황, 엑셀식 사이즈 필터, 개인별 현황, 품목/이미지/사이즈표 설정 화면
+  - `admin.html` - 보급대 간부용 일자별 현황, 엑셀식 사이즈 필터, 개인별 현황, 품목/이미지/사이즈표 설정, 관리자 설정 화면
   - `data/distribution-config.json` - 차수, 품목, 사이즈, 이미지, 추천방식 설정
   - `src/recommender.js` - 기수/교번/키/몸무게 기반 추천 알고리즘
 - `apps-script/Code.gs` - Google Apps Script Web App API
@@ -23,7 +23,7 @@ npm run serve
 
 `distribution-config.json`의 `api.appsScriptUrl`이 비어 있으면 브라우저 `localStorage`를 사용하는 목업 저장소로 동작합니다. 그래서 로컬에서 바로 1차/2차 흐름과 관리자 현황을 확인할 수 있습니다.
 
-관리자 화면에서 품목/사이즈표를 저장하면 로컬 목업에서는 같은 브라우저의 `localStorage`에 반영됩니다. Apps Script를 연결한 운영 환경에서는 `runtime_config` 시트에 저장되고, 신병 화면을 새로고침하면 최신 설정을 불러옵니다.
+관리자 화면에서 품목/사이즈표/기수 목록을 저장하면 로컬 목업에서는 같은 브라우저의 `localStorage`에 반영됩니다. Apps Script를 연결한 운영 환경에서는 `runtime_config` 시트에 저장되고, 신병 화면을 새로고침하면 최신 설정을 불러옵니다.
 
 ## GitHub Pages 배포
 
@@ -78,12 +78,13 @@ Google Sheets의 `raw_records`는 품목 1개당 1행으로 저장합니다. 개
 - `ml_training` - 추천/최종 사이즈, 교체 여부, 구간화된 학습 지표
 - `ml_summary` - 일자별 학습 데이터 수와 추천 기준값 변화
 
-## 품목/차수 추가
+## 품목/차수/기수 추가
 
-기본값은 `docs/data/distribution-config.json`에 둡니다. 운영 중 품목/이미지/사이즈표 변경은 데스크탑 관리자 화면의 `품목 / 사이즈표 설정`에서 처리할 수 있습니다. 스마트폰 폭에서는 수정 기능을 숨기고 전체 수치와 일자별 현황만 조회합니다.
+기본값은 `docs/data/distribution-config.json`에 둡니다. 운영 중 품목/이미지/사이즈표 변경은 데스크탑 관리자 화면의 `품목 / 사이즈표 설정`에서 처리할 수 있습니다. 기수 목록과 관리자 PIN은 `관리자 설정`에서 처리합니다. 스마트폰 폭에서는 수정 기능을 숨기고 전체 수치와 일자별 현황만 조회합니다.
 
 - `rounds[].itemIds`에 품목 ID를 넣으면 해당 차수 화면에 자동 표시됩니다.
 - `items[]`에 품목명, 사이즈 목록, 이미지, 추천방식을 추가합니다.
+- `cohorts[]`에 기수명을 추가하면 신병 화면의 기수 드롭다운에 표시됩니다.
 - 추천방식은 `upper`, `lower`, `outer`, `inner`, `shoes`, `manual`을 사용합니다.
 
 정적 GitHub Pages 프론트엔드가 GitHub 저장소에 직접 쓰도록 만들면 토큰이 노출될 수 있으므로, v1은 Apps Script가 설정 저장 API 역할을 합니다. GitHub Actions는 정적 앱 배포에 쓰고, 현장 설정 변경은 Google Sheets/Apps Script 런타임 설정으로 즉시 반영하는 구조입니다.

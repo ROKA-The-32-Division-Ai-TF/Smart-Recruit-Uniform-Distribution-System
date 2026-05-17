@@ -86,12 +86,14 @@ function renderDashboard(summary, notice = "") {
             ${renderNavButton("dashboard", "데시보드")}
             ${renderNavButton("issues", "불출현황")}
             ${renderNavButton("settings", "품목/사이즈 설정")}
+            ${renderNavButton("adminSettings", "관리자 설정")}
           </nav>
           <div class="dashboard-spacer"></div>
         </header>
         ${activeDesktopView === "dashboard" ? renderDesktopOverview(summary, today, itemShares) : ""}
         ${activeDesktopView === "issues" ? renderIssueView(issueSummary, dailySummary) : ""}
         ${activeDesktopView === "settings" ? renderSettingsView(notice) : ""}
+        ${activeDesktopView === "adminSettings" ? renderAdminSettingsView(notice) : ""}
       </div>
     </div>
   `;
@@ -103,8 +105,11 @@ function renderDashboard(summary, notice = "") {
     bindExcelFilters();
   }
   if (activeDesktopView === "settings" && document.querySelector("#addConfigItem")) {
-    bindPinEditor();
     bindConfigEditor();
+  }
+  if (activeDesktopView === "adminSettings") {
+    bindPinEditor();
+    bindAdminSettingsEditor();
   }
 }
 
@@ -195,8 +200,26 @@ function renderSettingsView(notice) {
         <p>품목 카드를 열어 이미지, 차수, 사이즈표를 관리합니다.</p>
       </div>
     </section>
-    ${renderPinEditor()}
     ${renderConfigEditor(notice)}
+  `;
+}
+
+function renderAdminSettingsView(notice) {
+  return `
+    <section class="desktop-view-head">
+      <div>
+        <h1>관리자 설정</h1>
+        <p>PIN, 기수, 제작자 정보와 시스템 흐름을 관리합니다.</p>
+      </div>
+      <button id="saveAdminSettings" class="secondary-button strong settings-save-button" type="button">설정 저장</button>
+    </section>
+    <p id="adminSettingsNotice" class="config-notice">${esc(notice)}</p>
+    <div class="admin-settings-grid">
+      ${renderPinEditor()}
+      ${renderCohortEditor()}
+      ${renderCreatorPanel()}
+      ${renderSystemFlowPanel()}
+    </div>
   `;
 }
 
@@ -229,6 +252,94 @@ function renderPinEditor() {
   `;
 }
 
+function renderCohortEditor() {
+  const cohorts = config.cohorts?.length ? config.cohorts : [];
+  return `
+    <section class="admin-section cohort-editor">
+      <div class="section-head">
+        <div>
+          <h2>기수 관리</h2>
+          <p>신병 화면의 기수 선택 목록으로 바로 사용됩니다.</p>
+        </div>
+        <button id="addCohort" class="secondary-button compact-button" type="button">기수 추가</button>
+      </div>
+      <div id="cohortEntries" class="cohort-entry-list">
+        ${(cohorts.length ? cohorts : [{ label: "", active: true }]).map((cohort, index) => renderCohortEntry(cohort, index)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderCohortEntry(cohort, index) {
+  return `
+    <article class="cohort-entry" data-cohort-entry>
+      <input data-cohort-field="cohortId" type="hidden" value="${esc(cohort.cohortId || sanitizeItemId(cohort.label || `cohort_${index + 1}`))}" />
+      <input data-cohort-field="order" type="hidden" value="${esc(cohort.order || index + 1)}" />
+      <label>
+        <span>기수명</span>
+        <input data-cohort-field="label" value="${esc(cohort.label || "")}" placeholder="예: 26-4기" />
+      </label>
+      <label class="cohort-active">
+        <input data-cohort-field="active" type="checkbox" ${cohort.active === false ? "" : "checked"} />
+        <span>사용</span>
+      </label>
+      <div class="config-order-actions">
+        <button data-move-cohort="up" type="button">위</button>
+        <button data-move-cohort="down" type="button">아래</button>
+        <button class="remove-cohort" type="button">삭제</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderCreatorPanel() {
+  const creators = config.metadata?.creators?.length ? config.metadata.creators : ["제32보병사단 AI TF", "백룡 AI The One"];
+  return `
+    <section class="admin-section creator-panel">
+      <div class="section-head">
+        <div>
+          <h2>만든 사람들</h2>
+          <p>쉼표나 줄바꿈으로 여러 명을 입력할 수 있습니다.</p>
+        </div>
+      </div>
+      <div class="creator-editor">
+        <textarea id="creatorNames" rows="5" placeholder="예: 홍길동, 이순신">${esc(creators.join("\n"))}</textarea>
+      </div>
+    </section>
+  `;
+}
+
+function renderSystemFlowPanel() {
+  const steps = [
+    ["관리자", "기수/차수/품목 설정"],
+    ["신병", "기수 선택 후 교번/키/몸무게 입력"],
+    ["정적 앱", "브라우저에서 사이즈 추천 계산"],
+    ["신병", "직접 선택 품목 선택 후 최종 확정"],
+    ["API", "Apps Script가 결과만 저장"],
+    ["Sheets", "불출 현황/학습 데이터 정리"],
+    ["관리자", "현황 확인 및 다음 설정 반영"]
+  ];
+  return `
+    <section class="admin-section system-flow-panel">
+      <div class="section-head">
+        <div>
+          <h2>프로그램 동작 방식</h2>
+          <p>현장 사용 흐름을 기준으로 한 순서도입니다.</p>
+        </div>
+      </div>
+      <div class="flow-lane">
+        ${steps.map(([title, description], index) => `
+          <div class="flow-step">
+            <b>${String(index + 1).padStart(2, "0")}</b>
+            <strong>${esc(title)}</strong>
+            <span>${esc(description)}</span>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function bindDesktopNav() {
   document.querySelectorAll("[data-desktop-nav]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -247,7 +358,7 @@ function bindIssueControls() {
   });
   document.querySelectorAll("[data-issue-panel]").forEach((button) => {
     button.addEventListener("click", () => {
-      activeIssuePanel = button.dataset.issuePanel || "size";
+      activeIssuePanel = activeIssuePanel === button.dataset.issuePanel ? "" : button.dataset.issuePanel || "size";
       renderDashboard(currentSummary);
     });
   });
@@ -288,6 +399,119 @@ function bindPinEditor() {
       notice.textContent = error.message || "PIN 변경에 실패했습니다.";
     }
   });
+}
+
+function bindAdminSettingsEditor() {
+  document.querySelector("#addCohort")?.addEventListener("click", addCohortEntry);
+  document.querySelector("#saveAdminSettings")?.addEventListener("click", saveAdminSettings);
+  document.querySelectorAll("[data-cohort-entry]").forEach(bindCohortEntry);
+}
+
+function addCohortEntry() {
+  const container = document.querySelector("#cohortEntries");
+  const nextNumber = container.querySelectorAll("[data-cohort-entry]").length + 1;
+  const cohort = {
+    cohortId: `cohort_${Date.now()}`,
+    label: "",
+    order: nextNumber,
+    active: true
+  };
+  container.insertAdjacentHTML("beforeend", renderCohortEntry(cohort, nextNumber - 1));
+  bindCohortEntry(container.lastElementChild);
+  refreshCohortOrders();
+  container.lastElementChild.querySelector('[data-cohort-field="label"]')?.focus();
+  setAdminSettingsNotice("새 기수를 추가했습니다. 기수명을 입력하고 설정 저장을 눌러 주세요.");
+}
+
+function bindCohortEntry(node) {
+  node.querySelectorAll("[data-move-cohort]").forEach((button) => {
+    button.onclick = () => {
+      moveConfigNode(node, button.dataset.moveCohort, "[data-cohort-entry]");
+      refreshCohortOrders();
+    };
+  });
+  node.querySelector(".remove-cohort").onclick = () => {
+    const entries = document.querySelectorAll("[data-cohort-entry]");
+    if (entries.length <= 1) {
+      setAdminSettingsNotice("기수는 최소 1개가 필요합니다.");
+      return;
+    }
+    node.remove();
+    refreshCohortOrders();
+    setAdminSettingsNotice("기수를 삭제했습니다. 설정 저장을 누르면 반영됩니다.");
+  };
+}
+
+async function saveAdminSettings() {
+  const notice = document.querySelector("#adminSettingsNotice");
+  try {
+    const cohorts = collectCohortsFromEditor();
+    const creators = collectCreatorsFromEditor();
+    const nextConfig = {
+      ...config,
+      configVersion: new Date().toISOString(),
+      cohorts,
+      metadata: {
+        ...(config.metadata || {}),
+        creators
+      }
+    };
+    notice.textContent = "관리자 설정을 저장하는 중입니다.";
+    const result = await api.saveConfig(currentAdminPin, nextConfig);
+    if (result.ok === false) {
+      notice.textContent = result.message || "관리자 설정 저장에 실패했습니다.";
+      return;
+    }
+    config = normalizeConfig(result.config || nextConfig);
+    api = createApi(config);
+    currentSummary = await api.adminSummary(currentAdminPin);
+    renderDashboard(currentSummary, "관리자 설정 저장 완료. 신병 화면을 새로고침하면 반영됩니다.");
+  } catch (error) {
+    notice.textContent = error.message || "관리자 설정 저장에 실패했습니다.";
+  }
+}
+
+function collectCohortsFromEditor() {
+  const entries = [...document.querySelectorAll("[data-cohort-entry]")];
+  const seen = new Set();
+  const cohorts = entries.map((node, index) => {
+    const get = (field) => node.querySelector(`[data-cohort-field="${field}"]`)?.value?.trim() || "";
+    const label = normalizeCohortLabel(get("label"));
+    if (!label) return null;
+    if (seen.has(label)) throw new Error(`기수가 중복되었습니다: ${label}`);
+    seen.add(label);
+    return {
+      cohortId: sanitizeItemId(get("cohortId") || label),
+      label,
+      order: index + 1,
+      active: node.querySelector('[data-cohort-field="active"]')?.checked !== false
+    };
+  }).filter(Boolean);
+  if (!cohorts.length) throw new Error("기수는 최소 1개 이상 입력해 주세요.");
+  return cohorts;
+}
+
+function collectCreatorsFromEditor() {
+  return String(document.querySelector("#creatorNames")?.value || "")
+    .split(/[\n,]/)
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
+function refreshCohortOrders() {
+  document.querySelectorAll("[data-cohort-entry]").forEach((node, index) => {
+    const order = node.querySelector('[data-cohort-field="order"]');
+    if (order) order.value = String(index + 1);
+  });
+}
+
+function normalizeCohortLabel(value) {
+  return String(value || "").trim().replace(/\s+/g, "");
+}
+
+function setAdminSettingsNotice(message) {
+  const notice = document.querySelector("#adminSettingsNotice");
+  if (notice) notice.textContent = message;
 }
 
 function renderMobileDashboard(summary, dailySummary, mobileDate, mobileItemId, mobileItemOptions, issueSummary, metrics) {
