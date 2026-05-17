@@ -19,12 +19,11 @@ let activeDesktopView = "issues";
 let activeIssuePanel = "size";
 let selectedIssueDate = "all";
 let visibleIssueMonth = "";
+let issueDatePickerOpen = false;
 let selectedMobileDate = "";
 let selectedMobileItemId = "all";
 let mobilePersonQuery = "";
 let draggedRoundItem = null;
-let adminSettingsSaveTimer = null;
-let adminSettingsSaving = false;
 const expandedConfigItems = new Set();
 
 init();
@@ -93,7 +92,7 @@ function renderDashboard(summary, notice = "") {
           </div>
           <nav class="desktop-nav" aria-label="관리자 화면 전환">
             ${renderNavButton("issues", "불출현황")}
-            ${renderNavButton("settings", "품목/사이즈 설정")}
+            ${renderNavButton("settings", "불출 설정")}
             ${renderNavButton("dashboard", "인공지능 학습")}
             ${renderNavButton("adminSettings", "관리자 설정")}
           </nav>
@@ -168,13 +167,31 @@ function renderDesktopOverview(summary) {
 function renderIssueView(issueSummary, dailySummary) {
   return `
     <section class="issue-date-dashboard">
-      ${renderIssueCalendar(dailySummary, selectedIssueDate)}
       ${renderIssueDateCard(issueSummary, selectedIssueDate)}
     </section>
+    ${issueDatePickerOpen ? renderIssueDateModal(dailySummary, selectedIssueDate) : ""}
     <section class="issue-accordion-list">
       ${renderIssueAccordion("size", "사이즈별 불출현황", renderSizeSummaryPanel(issueSummary))}
       ${renderIssueAccordion("person", "개인별 불출현황", renderPersonPanel(issueSummary))}
     </section>
+  `;
+}
+
+// 달력은 상시 노출하지 않고 팝업으로만 띄워 불출현황 첫 화면의 공간을 확보한다.
+function renderIssueDateModal(dailySummary, selectedDate) {
+  return `
+    <div class="issue-date-modal-backdrop" data-close-issue-date>
+      <section class="issue-date-modal" role="dialog" aria-modal="true" aria-label="불출 현황 날짜 설정">
+        <div class="issue-date-modal-head">
+          <div>
+            <strong>날짜 설정</strong>
+            <span>조회할 불출 일자를 선택합니다.</span>
+          </div>
+          <button data-close-issue-date type="button" aria-label="닫기">닫기</button>
+        </div>
+        ${renderIssueCalendar(dailySummary, selectedDate)}
+      </section>
+    </div>
   `;
 }
 
@@ -243,7 +260,7 @@ function renderIssueDateCard(issueSummary, selectedDate) {
           <span>선택 일자</span>
           <strong>${esc(formatKoreanDateLabel(selectedDate))}</strong>
         </div>
-        <b>${records.length.toLocaleString("ko-KR")}개</b>
+        <button class="secondary-button compact-button" data-open-issue-date type="button">날짜 설정</button>
       </header>
       <div class="issue-date-metrics">
         <div><span>인원</span><strong>${peopleCount.toLocaleString("ko-KR")}명</strong></div>
@@ -251,11 +268,13 @@ function renderIssueDateCard(issueSummary, selectedDate) {
         <div><span>교체</span><strong>${changedCount.toLocaleString("ko-KR")}건</strong></div>
         <div><span>교체율</span><strong>${rate}%</strong></div>
       </div>
-      <div class="issue-date-rounds">
-        ${roundRows.map((row) => `<span>${esc(row.roundName)} <b>${row.itemCount.toLocaleString("ko-KR")}개</b></span>`).join("") || `<span>해당 날짜 기록 없음</span>`}
-      </div>
-      <div class="issue-date-items">
-        ${topItems.map((item) => `<span><i style="background:${item.color}"></i>${esc(item.label)} ${item.percent}%</span>`).join("") || `<span>품목 비중 없음</span>`}
+      <div class="issue-date-details">
+        <div class="issue-date-rounds">
+          ${roundRows.map((row) => `<span>${esc(row.roundName)} <b>${row.itemCount.toLocaleString("ko-KR")}개</b></span>`).join("") || `<span>해당 날짜 기록 없음</span>`}
+        </div>
+        <div class="issue-date-items">
+          ${topItems.map((item) => `<span><i style="background:${item.color}"></i>${esc(item.label)} ${item.percent}%</span>`).join("") || `<span>품목 비중 없음</span>`}
+        </div>
       </div>
     </article>
   `;
@@ -304,7 +323,6 @@ function renderAdminSettingsView(notice) {
     <p id="adminSettingsNotice" class="config-notice">${esc(notice)}</p>
     <div class="admin-settings-grid">
       ${renderPinEditor()}
-      ${renderCohortEditor()}
       ${renderCreatorPanel()}
       ${renderSystemFlowPanel()}
       ${renderLearningFlowPanel()}
@@ -345,10 +363,10 @@ function renderPinEditor() {
 function renderCohortEditor() {
   const cohorts = config.cohorts?.length ? config.cohorts : [];
   return `
-    <section class="admin-section cohort-editor">
-      <div class="section-head">
+    <section class="config-stage cohort-editor">
+      <div class="config-stage-head">
         <div>
-          <h2>기수 관리</h2>
+          <h3>기수 설정</h3>
           <p>신병 화면의 기수 선택 목록으로 바로 사용됩니다.</p>
         </div>
         <button id="addCohort" class="secondary-button compact-button" type="button">기수 추가</button>
@@ -509,6 +527,18 @@ function bindDesktopNav() {
 }
 
 function bindIssueControls() {
+  document.querySelector("[data-open-issue-date]")?.addEventListener("click", () => {
+    issueDatePickerOpen = true;
+    renderDashboard(currentSummary);
+  });
+  document.querySelectorAll("[data-close-issue-date]").forEach((node) => {
+    node.addEventListener("click", (event) => {
+      const backdropClick = event.currentTarget.classList.contains("issue-date-modal-backdrop") && event.currentTarget !== event.target;
+      if (backdropClick) return;
+      issueDatePickerOpen = false;
+      renderDashboard(currentSummary);
+    });
+  });
   document.querySelectorAll("[data-calendar-month-offset]").forEach((button) => {
     button.addEventListener("click", () => {
       const offset = Number(button.dataset.calendarMonthOffset || 0);
@@ -520,6 +550,7 @@ function bindIssueControls() {
     button.addEventListener("click", () => {
       selectedIssueDate = button.dataset.calendarDate || formatDate(new Date());
       visibleIssueMonth = monthKey(selectedIssueDate);
+      issueDatePickerOpen = false;
       sizeColumnFilters = {};
       personColumnFilters = {};
       renderDashboard(currentSummary);
@@ -571,8 +602,6 @@ function bindPinEditor() {
 }
 
 function bindAdminSettingsEditor() {
-  document.querySelector("#addCohort")?.addEventListener("click", addCohortEntry);
-  document.querySelectorAll("[data-cohort-entry]").forEach(bindCohortEntry);
   document.querySelector("#resetAllData")?.addEventListener("click", resetAllData);
 }
 
@@ -589,76 +618,32 @@ function addCohortEntry() {
   bindCohortEntry(container.lastElementChild);
   refreshCohortOrders();
   container.lastElementChild.querySelector('[data-cohort-field="label"]')?.focus();
-  setAdminSettingsNotice("새 기수를 추가했습니다. 기수명을 입력하면 자동 저장됩니다.");
+  setConfigNotice("새 기수를 추가했습니다. 설정 저장을 누르면 반영됩니다.");
 }
 
 function bindCohortEntry(node) {
   node.querySelectorAll("[data-cohort-field]").forEach((input) => {
     if (input.type === "hidden") return;
-    input.addEventListener("input", () => scheduleAdminSettingsSave());
-    input.addEventListener("change", () => scheduleAdminSettingsSave());
+    input.addEventListener("input", () => setConfigNotice("기수 변경사항이 있습니다. 설정 저장을 누르면 반영됩니다."));
+    input.addEventListener("change", () => setConfigNotice("기수 변경사항이 있습니다. 설정 저장을 누르면 반영됩니다."));
   });
   node.querySelectorAll("[data-move-cohort]").forEach((button) => {
     button.onclick = () => {
       moveConfigNode(node, button.dataset.moveCohort, "[data-cohort-entry]");
       refreshCohortOrders();
-      scheduleAdminSettingsSave("기수 순서를 자동 저장하는 중입니다.");
+      setConfigNotice("기수 순서를 변경했습니다. 설정 저장을 누르면 반영됩니다.");
     };
   });
   node.querySelector(".remove-cohort").onclick = () => {
     const entries = document.querySelectorAll("[data-cohort-entry]");
     if (entries.length <= 1) {
-      setAdminSettingsNotice("기수는 최소 1개가 필요합니다.");
+      setConfigNotice("기수는 최소 1개가 필요합니다.");
       return;
     }
     node.remove();
     refreshCohortOrders();
-    scheduleAdminSettingsSave("기수 삭제 내용을 자동 저장하는 중입니다.");
+    setConfigNotice("기수를 삭제했습니다. 설정 저장을 누르면 반영됩니다.");
   };
-}
-
-function scheduleAdminSettingsSave(message = "변경사항을 자동 저장하는 중입니다.") {
-  clearTimeout(adminSettingsSaveTimer);
-  setAdminSettingsNotice(message);
-  adminSettingsSaveTimer = setTimeout(() => {
-    saveAdminSettings({ rerender: false });
-  }, 700);
-}
-
-async function saveAdminSettings({ rerender = false } = {}) {
-  const notice = document.querySelector("#adminSettingsNotice");
-  if (adminSettingsSaving) {
-    scheduleAdminSettingsSave("이전 저장이 끝나는 대로 다시 자동 저장합니다.");
-    return;
-  }
-  try {
-    adminSettingsSaving = true;
-    const cohorts = collectCohortsFromEditor();
-    const nextConfig = {
-      ...config,
-      configVersion: new Date().toISOString(),
-      cohorts,
-      metadata: { ...(config.metadata || {}) }
-    };
-    if (notice) notice.textContent = "관리자 설정을 저장하는 중입니다.";
-    const result = await api.saveConfig(currentAdminPin, nextConfig);
-    if (result.ok === false) {
-      if (notice) notice.textContent = result.message || "관리자 설정 저장에 실패했습니다.";
-      return;
-    }
-    config = normalizeConfig(result.config || nextConfig);
-    api = createApi(config);
-    currentSummary = await api.adminSummary(currentAdminPin);
-    if (rerender) {
-      renderDashboard(currentSummary, "관리자 설정 저장 완료. 신병 화면을 새로고침하면 반영됩니다.");
-    } else {
-      setAdminSettingsNotice("자동 저장 완료. 신병 화면을 새로고침하면 반영됩니다.");
-    }
-  } catch (error) {
-    if (notice) notice.textContent = error.message || "관리자 설정 저장에 실패했습니다.";
-  } finally {
-    adminSettingsSaving = false;
-  }
 }
 
 function collectCohortsFromEditor() {
@@ -696,6 +681,7 @@ async function resetAllData() {
     }
     selectedIssueDate = "all";
     visibleIssueMonth = "";
+    issueDatePickerOpen = false;
     selectedMobileDate = "";
     selectedMobileItemId = "all";
     sizeColumnFilters = {};
@@ -717,11 +703,6 @@ function refreshCohortOrders() {
 
 function normalizeCohortLabel(value) {
   return String(value || "").trim().replace(/\s+/g, "");
-}
-
-function setAdminSettingsNotice(message) {
-  const notice = document.querySelector("#adminSettingsNotice");
-  if (notice) notice.textContent = message;
 }
 
 function renderMobileDashboard(summary, dailySummary, mobileDate, mobileItemId, mobileItemOptions, issueSummary, metrics) {
@@ -1084,9 +1065,10 @@ function renderExchangePanel(insights) {
   const rate = Number(insights.changeRate || 0);
   return `
     <div class="exchange-dashboard">
-      <div class="exchange-ring" style="--exchange-ring: conic-gradient(#ef4444 0 ${rate}%, #e8eefb ${rate}% 100%);">
-        <strong>${rate}%</strong>
-        <span>교체율</span>
+      <div class="exchange-summary-strip">
+        <article><span>전체</span><strong>${Number(insights.totalCount || 0).toLocaleString("ko-KR")}건</strong></article>
+        <article><span>교체</span><strong>${Number(insights.changedCount || 0).toLocaleString("ko-KR")}건</strong></article>
+        <article><span>비율</span><strong>${rate}%</strong></article>
       </div>
       <div class="exchange-bars">
         ${insights.rows.map((row) => `
@@ -1207,8 +1189,7 @@ function buildDailySummary(records) {
       ...entry,
       peopleCount: entry.people.size
     }))
-    .sort((a, b) => String(b.date).localeCompare(String(a.date), "ko"))
-    .slice(0, 14);
+    .sort((a, b) => String(b.date).localeCompare(String(a.date), "ko"));
 }
 
 function buildIssueSummary(summary, date, itemId = "all") {
@@ -1579,6 +1560,7 @@ function renderConfigEditor(notice = "") {
         </button>
       </div>
       <p id="configNotice" class="config-notice">${esc(notice)}</p>
+      ${renderCohortEditor()}
       ${renderRoundEditor(config.rounds)}
       ${renderRoundCompositionEditor(config.rounds, config.items)}
       <section class="config-stage size-config-stage">
@@ -1727,6 +1709,7 @@ function renderRoundCompositionItem(item) {
 }
 
 function bindConfigEditor() {
+  document.querySelector("#addCohort")?.addEventListener("click", addCohortEntry);
   document.querySelector("#addConfigRound").addEventListener("click", addConfigRound);
   document.querySelector("#addConfigItem").addEventListener("click", () => {
     const container = document.querySelector("#configItems");
@@ -1750,6 +1733,7 @@ function bindConfigEditor() {
     node.querySelector('[data-field="label"]')?.focus();
   });
   document.querySelector("#saveConfig").addEventListener("click", saveConfigFromEditor);
+  document.querySelectorAll("[data-cohort-entry]").forEach(bindCohortEntry);
   document.querySelectorAll("[data-config-round]").forEach(bindConfigRound);
   document.querySelectorAll("[data-config-item]").forEach(bindConfigItem);
   bindRoundCompositionEditor();
@@ -2160,6 +2144,7 @@ async function saveConfigFromEditor() {
 }
 
 function collectConfigFromEditor() {
+  // 기수, 차수, 품목, 차수별 품목 순서를 한 번에 모아 설정 JSON으로 저장한다.
   const roundNodes = [...document.querySelectorAll("[data-config-round]")];
   if (!roundNodes.length) throw new Error("불출 차수는 최소 1개가 필요합니다.");
 
@@ -2188,6 +2173,7 @@ function collectConfigFromEditor() {
     };
   });
   const composition = readRoundCompositionEntries();
+  const cohorts = document.querySelector("[data-cohort-entry]") ? collectCohortsFromEditor() : config.cohorts;
 
   const rounds = roundDefinitions.map((round) => ({
     ...round,
@@ -2197,6 +2183,7 @@ function collectConfigFromEditor() {
   return {
     ...config,
     configVersion: new Date().toISOString(),
+    cohorts,
     rounds,
     items
   };
