@@ -3,7 +3,7 @@ import { createApi } from "./api.js";
 
 const app = document.querySelector("#adminApp");
 const UNIT_MARK_SRC = "assets/brand/unit-mark.svg";
-const CREATOR_IMAGE_SRC = "assets/brand/ai-tf-creators-wide.png";
+const CREATOR_IMAGE_SRC = "assets/brand/ai-tf-creators-112.png";
 let config;
 let api;
 let currentSummary;
@@ -257,11 +257,13 @@ function renderIssueDateCard(issueSummary, selectedDate) {
   return `
     <article class="issue-date-card">
       <header>
-        <div>
+        <div class="issue-date-heading">
           <span>선택 일자</span>
-          <strong>${esc(formatKoreanDateLabel(selectedDate))}</strong>
+          <div class="issue-date-title-row">
+            <strong>${esc(formatKoreanDateLabel(selectedDate))}</strong>
+            <button class="date-setting-button" data-open-issue-date type="button">날짜 설정</button>
+          </div>
         </div>
-        <button class="secondary-button compact-button" data-open-issue-date type="button">날짜 설정</button>
       </header>
       <div class="issue-date-metrics">
         <div><span>인원</span><strong>${peopleCount.toLocaleString("ko-KR")}명</strong></div>
@@ -324,10 +326,10 @@ function renderAdminSettingsView(notice) {
     <p id="adminSettingsNotice" class="config-notice">${esc(notice)}</p>
     <div class="admin-settings-grid">
       ${renderPinEditor()}
-      ${renderCreatorPanel()}
       ${renderSystemFlowPanel()}
       ${renderLearningFlowPanel()}
       ${renderResetPanel()}
+      ${renderCreatorPanel()}
     </div>
   `;
 }
@@ -1592,9 +1594,9 @@ function renderConfigStage({ id, className = "", title, description, body, actio
           </span>
           <b>${collapsed ? "열기" : "접기"}</b>
         </button>
+        ${actions ? `<div class="config-stage-actions" ${collapsed ? "hidden" : ""}>${actions}</div>` : ""}
       </div>
       <div class="config-stage-body" ${collapsed ? "hidden" : ""}>
-        ${actions ? `<div class="config-stage-actions">${actions}</div>` : ""}
         ${body}
       </div>
     </section>
@@ -1750,9 +1752,11 @@ function setConfigStageCollapsed(id, collapsed) {
   const stage = document.querySelector(`[data-config-stage="${cssEscape(id)}"]`);
   if (!stage) return;
   const body = stage.querySelector(".config-stage-body");
+  const actions = stage.querySelector(".config-stage-actions");
   const toggle = stage.querySelector("[data-config-stage-toggle]");
   stage.classList.toggle("collapsed", collapsed);
   if (body) body.hidden = collapsed;
+  if (actions) actions.hidden = collapsed;
   if (toggle) {
     toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
     toggle.querySelector("b").textContent = collapsed ? "열기" : "접기";

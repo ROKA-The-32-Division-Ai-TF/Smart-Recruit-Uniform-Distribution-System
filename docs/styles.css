@@ -1715,6 +1715,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -1774,7 +1775,12 @@ button:disabled {
   gap: 10px;
   align-items: center;
   justify-content: flex-start;
-  padding: 2px 0 4px;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
+.config-stage-actions[hidden] {
+  display: none;
 }
 
 .stage-action-button {
@@ -3190,11 +3196,35 @@ button:disabled {
 }
 
 .issue-date-card header {
-  display: grid;
+  display: block;
   grid-area: date;
-  align-content: start;
-  justify-content: stretch;
-  gap: 12px;
+  align-self: start;
+}
+
+.issue-date-heading {
+  display: grid;
+  gap: 7px;
+}
+
+.issue-date-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.date-setting-button {
+  min-height: 34px;
+  border: 1px solid #d8e5fb;
+  border-radius: 999px;
+  padding: 0 12px;
+  color: var(--blue);
+  background: #eef5ff;
+  box-shadow: 0 8px 16px rgba(41, 79, 174, 0.08);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 950;
+  cursor: pointer;
 }
 
 .issue-date-metrics {
