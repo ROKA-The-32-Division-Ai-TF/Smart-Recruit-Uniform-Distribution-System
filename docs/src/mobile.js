@@ -60,7 +60,7 @@ function renderInput(message = "") {
           </label>
         </div>
         <div class="input-line"></div>
-        <p class="input-note">의류는 백룡AI가 추천하고, 신발과 모자는 해당 품목에서 직접 선택합니다.</p>
+        <p class="input-note">키와 몸무게는 백룡 AI가 스마트폰 안에서 추천 계산에만 사용합니다. 최종 확정 시에는 불출받은 사이즈 정보만 안전하게 전달됩니다.</p>
         <button class="primary-button" type="submit">추천 사이즈 보기</button>
         <p id="formMessage" class="form-message">${esc(message)}</p>
       </form>
