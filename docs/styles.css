@@ -1693,21 +1693,55 @@ button:disabled {
   padding: 0 14px;
 }
 
-.config-actions {
+.config-command-bar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 12px;
+  padding: 18px 18px 12px;
+}
+
+.config-command-button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
   gap: 10px;
-  align-content: center;
+  min-height: 58px;
+  border: 1px solid #d8e5fb;
+  border-radius: 18px;
+  padding: 0 16px;
+  color: var(--blue-dark);
+  background: linear-gradient(180deg, #ffffff, #f5f9ff);
+  box-shadow: 0 12px 24px rgba(41, 79, 174, 0.08);
+  text-align: left;
+  cursor: pointer;
 }
 
-.config-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 18px 18px 8px;
+.config-command-button span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  color: var(--blue);
+  background: #eef4ff;
+  font-size: 1.1rem;
+  font-weight: 950;
 }
 
-.config-toolbar .config-actions {
-  width: min(560px, 100%);
+.config-command-button strong {
+  font-size: 0.98rem;
+  font-weight: 950;
+}
+
+.config-command-button.primary {
+  color: #ffffff;
+  border-color: var(--blue);
+  background: linear-gradient(135deg, var(--blue), #17377d);
+}
+
+.config-command-button.primary span {
+  color: var(--blue);
+  background: #ffffff;
 }
 
 .config-notice {
@@ -1718,13 +1752,7 @@ button:disabled {
   font-weight: 900;
 }
 
-.config-items {
-  display: grid;
-  gap: 12px;
-  padding: 0 18px 18px;
-}
-
-.round-editor {
+.config-stage {
   display: grid;
   gap: 12px;
   margin: 0 18px 16px;
@@ -1734,23 +1762,28 @@ button:disabled {
   background: #f8fbff;
 }
 
-.round-editor-head {
+.config-stage-head {
   display: flex;
   align-items: start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.round-editor-head h3 {
+.config-stage-head h3 {
   margin: 0;
   color: var(--blue-dark);
   font-size: 1.05rem;
 }
 
-.round-editor-head p {
+.config-stage-head p {
   margin: 4px 0 0;
   color: var(--muted);
   font-weight: 850;
+}
+
+.config-items {
+  display: grid;
+  gap: 12px;
 }
 
 .round-entry-list {
@@ -1928,32 +1961,9 @@ button:disabled {
 }
 
 .round-composition-editor {
-  display: grid;
-  gap: 12px;
-  margin: 0 18px 18px;
-  padding: 14px;
   border: 1px solid #d8e5fb;
   border-radius: 18px;
   background: #f8fbff;
-}
-
-.round-composition-head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.round-composition-head h3 {
-  margin: 0;
-  color: var(--blue-dark);
-  font-size: 1.05rem;
-}
-
-.round-composition-head p {
-  margin: 4px 0 0;
-  color: #637088;
-  font-weight: 850;
 }
 
 .round-composition-list {
@@ -2062,8 +2072,6 @@ button:disabled {
 
 .round-add-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
 }
 
 .round-add-row select {
@@ -2075,13 +2083,6 @@ button:disabled {
   background: #ffffff;
   font: inherit;
   font-weight: 900;
-}
-
-.round-add-row .secondary-button {
-  width: auto;
-  min-height: 44px;
-  padding: 0 14px;
-  border-radius: 12px;
 }
 
 .remove-config-item {
@@ -2170,23 +2171,6 @@ button:disabled {
   padding: 0 16px;
   border-radius: 13px;
   white-space: nowrap;
-}
-
-.table-action-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 18px;
-  border-bottom: 1px solid #d8e5fb;
-  color: #637088;
-  font-weight: 900;
-}
-
-.table-action-bar span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .exchange-dot {
@@ -2926,15 +2910,22 @@ button:disabled {
   box-shadow: 0 18px 36px rgba(41, 79, 174, 0.08);
 }
 
-.issue-accordion-toggle {
+.issue-accordion-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  width: 100%;
   min-height: 78px;
+  padding: 14px 16px 14px 20px;
+}
+
+.issue-accordion-toggle {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
   border: 0;
-  padding: 18px 20px;
+  padding: 0;
   color: var(--blue-dark);
   background: transparent;
   text-align: left;
@@ -2955,14 +2946,49 @@ button:disabled {
   font-weight: 850;
 }
 
-.issue-accordion-toggle b {
+.issue-accordion-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.accordion-exchange-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #fecdd3;
+  border-radius: 999px;
+  color: #991b1b;
+  background: #fff1f2;
+  font-size: 0.86rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.compact-print-button {
+  width: auto;
+  min-height: 40px;
+  border-radius: 999px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.issue-toggle-pill {
   display: grid;
   place-items: center;
   min-width: 64px;
   min-height: 40px;
+  border: 0;
   border-radius: 999px;
   color: #ffffff;
   background: var(--blue);
+  font: inherit;
+  font-weight: 950;
+  cursor: pointer;
 }
 
 .issue-accordion-body .admin-section {
@@ -2979,7 +3005,7 @@ button:disabled {
 
 .desktop-dashboard .section-head h2,
 .desktop-dashboard .sizes-editor-head h3,
-.desktop-dashboard .round-editor-head h3 {
+.desktop-dashboard .config-stage-head h3 {
   color: var(--blue-dark);
 }
 
@@ -2989,7 +3015,7 @@ button:disabled {
 .desktop-dashboard .config-card-head label,
 .desktop-dashboard .sizes-editor,
 .desktop-dashboard .image-uploader,
-.desktop-dashboard .round-editor-head p,
+.desktop-dashboard .config-stage-head p,
 .desktop-dashboard .round-entry label,
 .desktop-dashboard .round-entry label span {
   color: #637088;
@@ -3355,7 +3381,7 @@ button:disabled {
     display: block;
   }
 
-  .config-actions,
+  .config-command-bar,
   .config-card-head,
   .image-uploader,
   .image-actions,
@@ -3395,10 +3421,6 @@ button:disabled {
     transform: translateX(50%) rotate(135deg);
   }
 
-  .config-actions {
-    margin-top: 14px;
-  }
-
   .sizes-editor-head {
     display: grid;
   }
@@ -3417,21 +3439,31 @@ button:disabled {
     padding-right: 12px;
   }
 
-  .round-composition-editor {
+  .config-stage {
     margin-left: 12px;
     margin-right: 12px;
   }
 
   .round-add-row,
-  .table-action-bar,
   .view-control-bar {
     display: grid;
     grid-template-columns: 1fr;
     align-items: stretch;
   }
 
-  .table-action-bar .print-report-button {
-    width: 100%;
+  .issue-accordion-head {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .issue-accordion-actions {
+    justify-content: start;
+    flex-wrap: wrap;
+  }
+
+  .accordion-exchange-legend {
+    white-space: normal;
   }
 }
 

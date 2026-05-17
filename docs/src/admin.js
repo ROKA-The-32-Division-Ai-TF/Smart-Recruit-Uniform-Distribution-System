@@ -167,17 +167,32 @@ function renderIssueAccordion(panel, title, description, content) {
   const open = activeIssuePanel === panel;
   return `
     <article class="issue-accordion ${open ? "open" : ""}">
-      <button class="issue-accordion-toggle" data-issue-panel="${esc(panel)}" type="button" aria-expanded="${open ? "true" : "false"}">
-        <span>
-          <strong>${esc(title)}</strong>
-          <small>${esc(description)}</small>
-        </span>
-        <b>${open ? "접기" : "열기"}</b>
-      </button>
+      <div class="issue-accordion-head">
+        <button class="issue-accordion-toggle" data-issue-panel="${esc(panel)}" type="button" aria-expanded="${open ? "true" : "false"}">
+          <span>
+            <strong>${esc(title)}</strong>
+            <small>${esc(description)}</small>
+          </span>
+        </button>
+        <div class="issue-accordion-actions">
+          ${open ? renderIssueAccordionActions(panel) : ""}
+          <button class="issue-toggle-pill" data-issue-panel="${esc(panel)}" type="button" aria-expanded="${open ? "true" : "false"}">${open ? "접기" : "열기"}</button>
+        </div>
+      </div>
       <div class="issue-accordion-body" ${open ? "" : "hidden"}>
         ${content}
       </div>
     </article>
+  `;
+}
+
+function renderIssueAccordionActions(panel) {
+  const legend = panel === "person"
+    ? `<span class="accordion-exchange-legend"><i class="exchange-dot"></i>빨간색 행은 교체 이력이 있는 인원입니다.</span>`
+    : "";
+  return `
+    ${legend}
+    <button class="secondary-button print-report-button compact-print-button" data-print-report="${esc(panel)}" type="button">인쇄</button>
   `;
 }
 
@@ -836,10 +851,6 @@ function renderDonut(items) {
 function renderSizeSummaryPanel(summary) {
   return `
     <section class="admin-section desktop-only dashboard-table-panel">
-      <div class="table-action-bar">
-        <span>표 제목의 필터 버튼으로 골라 볼 수 있습니다.</span>
-        <button class="secondary-button print-report-button" data-print-report="size" type="button">인쇄</button>
-      </div>
       <div class="table-wrap">
         <table class="admin-table excel-table" id="sizeTable">
           <thead>
@@ -867,10 +878,6 @@ function renderSizeSummaryPanel(summary) {
 function renderPersonPanel(summary) {
   return `
     <section class="admin-section desktop-only dashboard-table-panel">
-      <div class="table-action-bar">
-        <span><i class="exchange-dot"></i>빨간색 행은 교체 이력이 있는 인원입니다.</span>
-        <button class="secondary-button print-report-button" data-print-report="person" type="button">인쇄</button>
-      </div>
       <div class="table-wrap">
         <table class="admin-table" id="personTable">
           <thead>
@@ -1254,36 +1261,51 @@ function uniqueOrdered(values) {
 function renderConfigEditor(notice = "") {
   return `
     <section class="admin-section config-section">
-      <div class="config-toolbar">
-        <div class="config-actions">
-          <button id="addConfigRound" class="secondary-button" type="button">차수 추가</button>
-          <button id="addConfigItem" class="secondary-button" type="button">품목 추가</button>
-          <button id="saveConfig" class="secondary-button strong" type="button">설정 저장</button>
-        </div>
+      <div class="config-command-bar">
+        <button id="addConfigRound" class="config-command-button" type="button">
+          <span>+</span>
+          <strong>차수 추가</strong>
+        </button>
+        <button id="addConfigItem" class="config-command-button" type="button">
+          <span>+</span>
+          <strong>품목 추가</strong>
+        </button>
+        <button id="saveConfig" class="config-command-button primary" type="button">
+          <span>✓</span>
+          <strong>설정 저장</strong>
+        </button>
       </div>
       <p id="configNotice" class="config-notice">${esc(notice)}</p>
       ${renderRoundEditor(config.rounds)}
-      <div id="configItems" class="config-items">
-        ${config.items.map((item) => renderConfigItem(item)).join("")}
-      </div>
       ${renderRoundCompositionEditor(config.rounds, config.items)}
+      <section class="config-stage size-config-stage">
+        <div class="config-stage-head">
+          <div>
+            <h3>품목 / 사이즈표 관리</h3>
+            <p>품목을 열어서 이미지와 사이즈표를 수정합니다.</p>
+          </div>
+        </div>
+        <div id="configItems" class="config-items">
+          ${config.items.map((item) => renderConfigItem(item)).join("")}
+        </div>
+      </section>
     </section>
   `;
 }
 
 function renderRoundEditor(rounds) {
   return `
-    <div class="round-editor">
-      <div class="round-editor-head">
+    <section class="config-stage round-editor">
+      <div class="config-stage-head">
         <div>
-          <h3>불출 차수</h3>
+          <h3>불출 차수 설정</h3>
           <p>예: 3차 불출, 4차 불출처럼 필요한 만큼 추가할 수 있습니다.</p>
         </div>
       </div>
       <div id="configRounds" class="round-entry-list">
         ${(rounds || []).map((round, index) => renderConfigRound(round, index)).join("")}
       </div>
-    </div>
+    </section>
   `;
 }
 
@@ -1360,10 +1382,10 @@ function renderConfigItem(item) {
 
 function renderRoundCompositionEditor(rounds, items) {
   return `
-    <section class="round-composition-editor">
-      <div class="round-composition-head">
+    <section class="config-stage round-composition-editor">
+      <div class="config-stage-head">
         <div>
-          <h3>차수별 구성 / 불출 순서</h3>
+          <h3>차수별 구성 / 불출 순서 설정</h3>
           <p>품목을 차수에 추가한 뒤 마우스로 끌어서 신병 화면 표시 순서를 바꿉니다.</p>
         </div>
       </div>
@@ -1393,7 +1415,6 @@ function renderRoundComposition(round, items) {
           <option value="">품목 선택</option>
           ${unused.map((item) => `<option value="${esc(item.itemId)}">${esc(item.label)}</option>`).join("")}
         </select>
-        <button class="secondary-button" data-add-round-item-button type="button" ${unused.length ? "" : "disabled"}>추가</button>
       </div>
     </article>
   `;
@@ -1536,7 +1557,7 @@ function bindRoundCompositionEditor() {
   document.querySelectorAll("[data-round-composition]").forEach((panel) => {
     const zone = panel.querySelector("[data-round-items]");
     const select = panel.querySelector("[data-add-round-item]");
-    panel.querySelector("[data-add-round-item-button]")?.addEventListener("click", () => {
+    select?.addEventListener("change", () => {
       const itemId = select?.value || "";
       if (!itemId) return;
       const item = readItemEditorEntries().find((candidate) => candidate.itemId === itemId);
@@ -1544,6 +1565,7 @@ function bindRoundCompositionEditor() {
       zone.querySelector(".round-empty")?.remove();
       zone.insertAdjacentHTML("beforeend", renderRoundCompositionItem(item));
       bindRoundCompositionChip(zone.lastElementChild);
+      select.value = "";
       refreshRoundCompositionSelects();
     });
     zone.addEventListener("dragover", (event) => {
@@ -1626,7 +1648,6 @@ function refreshRoundCompositionSelects() {
   document.querySelectorAll("[data-round-composition]").forEach((panel) => {
     const assigned = new Set([...panel.querySelectorAll("[data-round-item-id]")].map((chip) => chip.dataset.roundItemId));
     const select = panel.querySelector("[data-add-round-item]");
-    const button = panel.querySelector("[data-add-round-item-button]");
     const unused = items.filter((item) => !assigned.has(item.itemId));
     if (!select) return;
     const previous = select.value;
@@ -1635,7 +1656,7 @@ function refreshRoundCompositionSelects() {
       ${unused.map((item) => `<option value="${esc(item.itemId)}">${esc(item.label)}</option>`).join("")}
     `;
     if (unused.some((item) => item.itemId === previous)) select.value = previous;
-    if (button) button.disabled = unused.length === 0;
+    select.disabled = unused.length === 0;
     panel.querySelector("header span").textContent = `${assigned.size.toLocaleString("ko-KR")}개 품목`;
   });
 }
