@@ -348,6 +348,10 @@ function renderItem() {
     }
   });
   document.querySelector("#nextItem").addEventListener("click", () => {
+    if (isDirectSelectionItem(item) && !item.finalSize) {
+      showInfoModal("선택 필요", `${item.label} 사이즈를 직접 선택해 주세요.`);
+      return;
+    }
     if (state.itemIndex < state.issueItems.length - 1) {
       state.itemIndex += 1;
       renderItem();
