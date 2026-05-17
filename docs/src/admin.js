@@ -3,6 +3,7 @@ import { createApi } from "./api.js";
 
 const app = document.querySelector("#adminApp");
 const UNIT_MARK_SRC = "assets/brand/unit-mark.svg";
+const CREATOR_IMAGE_SRC = "assets/brand/ai-tf-creators.png";
 let config;
 let api;
 let currentSummary;
@@ -17,10 +18,13 @@ let currentIssueSummary = null;
 let activeDesktopView = "dashboard";
 let activeIssuePanel = "size";
 let selectedIssueDate = "all";
+let visibleIssueMonth = "";
 let selectedMobileDate = "";
 let selectedMobileItemId = "all";
 let mobilePersonQuery = "";
 let draggedRoundItem = null;
+let adminSettingsSaveTimer = null;
+let adminSettingsSaving = false;
 const expandedConfigItems = new Set();
 
 init();
@@ -69,7 +73,6 @@ function renderDashboard(summary, notice = "") {
   const mobileItemId = resolveMobileItem(mobileItemOptions);
   const mobileIssueSummary = buildIssueSummary(summary, mobileDate, mobileItemId);
   const mobileMetrics = buildMobileMetrics(summary.records || [], mobileDate, mobileItemId);
-  const itemShares = buildItemShares(summary.sizeSummary);
   const issueSummary = buildIssueSummary(summary, issueDate);
   currentIssueSummary = issueSummary;
   currentIssueSizeRows = issueSummary.sizeSummary;
@@ -97,7 +100,7 @@ function renderDashboard(summary, notice = "") {
           </nav>
           <div class="dashboard-spacer"></div>
         </header>
-        ${activeDesktopView === "dashboard" ? renderDesktopOverview(summary, today, itemShares) : ""}
+        ${activeDesktopView === "dashboard" ? renderDesktopOverview(summary, today) : ""}
         ${activeDesktopView === "issues" ? renderIssueView(issueSummary, dailySummary) : ""}
         ${activeDesktopView === "settings" ? renderSettingsView(notice) : ""}
         ${activeDesktopView === "adminSettings" ? renderAdminSettingsView(notice) : ""}
@@ -124,22 +127,15 @@ function renderNavButton(view, label) {
   return `<button class="${activeDesktopView === view ? "active" : ""}" data-desktop-nav="${esc(view)}" type="button">${esc(label)}</button>`;
 }
 
-function renderDesktopOverview(summary, today, itemShares) {
+function renderDesktopOverview(summary, today) {
   const learning = summary.learningSummary || { totalRows: 0, changedRows: 0, currentA: 24, history: [] };
   const dashboardDate = today.date === "-" ? "전체" : formatKoreanDateLabel(today.date);
-  const exchangeRate = today.itemCount ? Number(((today.changedCount / today.itemCount) * 100).toFixed(1)) : 0;
   const todayRecords = today.date === "-" ? summary.records || [] : filterRecordsByDate(summary.records || [], today.date);
   const todaySummary = buildSummaryFromRecords(summary, todayRecords);
   const shares = buildItemShares(todaySummary.sizeSummary);
   const exchangeInsights = buildExchangeInsights(todayRecords);
   const roundRows = buildRoundDashboardRows(todayRecords);
   return `
-    <section class="dashboard-kpi-grid">
-      ${renderKpiCard(`${dashboardDate} 불출 품목`, today.itemCount, "개", "primary")}
-      ${renderKpiCard(`${dashboardDate} 불출 인원`, today.peopleCount, "명")}
-      ${renderKpiCard(`${dashboardDate} 교체율`, exchangeRate, "%", exchangeRate ? "danger" : "success")}
-      ${renderKpiCard("누적 총 불출", summary.overview.totalItems, "개")}
-    </section>
     <section class="dashboard-analytics-grid">
       <article class="dashboard-panel learning-panel">
         <div class="panel-title">
@@ -180,15 +176,16 @@ function renderIssueView(issueSummary, dailySummary) {
       ${renderIssueDateCard(issueSummary, selectedIssueDate)}
     </section>
     <section class="issue-accordion-list">
-      ${renderIssueAccordion("size", "사이즈별 불출현황", "차수, 품목, 사이즈 기준 수량입니다.", renderSizeSummaryPanel(issueSummary))}
-      ${renderIssueAccordion("person", "개인별 불출현황", "교번별 최종 불출 사이즈입니다.", renderPersonPanel(issueSummary))}
+      ${renderIssueAccordion("size", "사이즈별 불출현황", renderSizeSummaryPanel(issueSummary))}
+      ${renderIssueAccordion("person", "개인별 불출현황", renderPersonPanel(issueSummary))}
     </section>
   `;
 }
 
 function renderIssueCalendar(dailySummary, selectedDate) {
   const todayText = formatDate(new Date());
-  const base = parseLocalDate(selectedDate !== "all" ? selectedDate : todayText);
+  const baseMonth = visibleIssueMonth || monthKey(selectedDate !== "all" ? selectedDate : todayText);
+  const base = parseLocalDate(`${baseMonth}-01`);
   const year = base.getFullYear();
   const month = base.getMonth();
   const monthStart = new Date(year, month, 1);
@@ -220,7 +217,11 @@ function renderIssueCalendar(dailySummary, selectedDate) {
           <strong>${year}년 ${month + 1}월</strong>
           <span>오늘 ${esc(formatKoreanDateLabel(todayText))}</span>
         </div>
-        <button data-calendar-date="${esc(todayText)}" type="button">오늘</button>
+        <div class="calendar-nav">
+          <button aria-label="이전 달" data-calendar-month-offset="-1" type="button">‹</button>
+          <button data-calendar-date="${esc(todayText)}" type="button">오늘</button>
+          <button aria-label="다음 달" data-calendar-month-offset="1" type="button">›</button>
+        </div>
       </header>
       <div class="calendar-weekdays">
         ${["일", "월", "화", "수", "목", "금", "토"].map((day) => `<span>${day}</span>`).join("")}
@@ -264,7 +265,7 @@ function renderIssueDateCard(issueSummary, selectedDate) {
   `;
 }
 
-function renderIssueAccordion(panel, title, description, content) {
+function renderIssueAccordion(panel, title, content) {
   const open = activeIssuePanel === panel;
   return `
     <article class="issue-accordion ${open ? "open" : ""}">
@@ -272,7 +273,6 @@ function renderIssueAccordion(panel, title, description, content) {
         <button class="issue-accordion-toggle" data-issue-panel="${esc(panel)}" type="button" aria-expanded="${open ? "true" : "false"}">
           <span>
             <strong>${esc(title)}</strong>
-            <small>${esc(description)}</small>
           </span>
         </button>
         <div class="issue-accordion-actions">
@@ -305,9 +305,6 @@ function renderSettingsView(notice) {
 
 function renderAdminSettingsView(notice) {
   return `
-    <section class="view-control-bar align-right">
-      <button id="saveAdminSettings" class="secondary-button strong settings-save-button" type="button">설정 저장</button>
-    </section>
     <p id="adminSettingsNotice" class="config-notice">${esc(notice)}</p>
     <div class="admin-settings-grid">
       ${renderPinEditor()}
@@ -395,11 +392,17 @@ function renderCreatorPanel() {
       <div class="section-head">
         <div>
           <h2>만든 사람들</h2>
-          <p>쉼표나 줄바꿈으로 여러 명을 입력할 수 있습니다.</p>
+          <p>제32보병사단 AI TF 제작진 표기입니다.</p>
         </div>
       </div>
+      <div class="creator-showcase">
+        <img src="${esc(CREATOR_IMAGE_SRC)}" alt="제32보병사단 AI TF 제작진" loading="lazy" />
+      </div>
       <div class="creator-editor">
-        <textarea id="creatorNames" rows="5" placeholder="예: 홍길동, 이순신">${esc(creators.join("\n"))}</textarea>
+        <label>
+          제작자 문구
+          <textarea id="creatorNames" rows="4" placeholder="예: 홍길동, 이순신">${esc(creators.join("\n"))}</textarea>
+        </label>
       </div>
     </section>
   `;
@@ -508,9 +511,17 @@ function bindDesktopNav() {
 }
 
 function bindIssueControls() {
+  document.querySelectorAll("[data-calendar-month-offset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const offset = Number(button.dataset.calendarMonthOffset || 0);
+      visibleIssueMonth = shiftMonthKey(visibleIssueMonth || monthKey(selectedIssueDate), offset);
+      renderDashboard(currentSummary);
+    });
+  });
   document.querySelectorAll("[data-calendar-date]").forEach((button) => {
     button.addEventListener("click", () => {
       selectedIssueDate = button.dataset.calendarDate || formatDate(new Date());
+      visibleIssueMonth = monthKey(selectedIssueDate);
       sizeColumnFilters = {};
       personColumnFilters = {};
       renderDashboard(currentSummary);
@@ -563,7 +574,7 @@ function bindPinEditor() {
 
 function bindAdminSettingsEditor() {
   document.querySelector("#addCohort")?.addEventListener("click", addCohortEntry);
-  document.querySelector("#saveAdminSettings")?.addEventListener("click", saveAdminSettings);
+  document.querySelector("#creatorNames")?.addEventListener("input", () => scheduleAdminSettingsSave());
   document.querySelectorAll("[data-cohort-entry]").forEach(bindCohortEntry);
 }
 
@@ -580,14 +591,20 @@ function addCohortEntry() {
   bindCohortEntry(container.lastElementChild);
   refreshCohortOrders();
   container.lastElementChild.querySelector('[data-cohort-field="label"]')?.focus();
-  setAdminSettingsNotice("새 기수를 추가했습니다. 기수명을 입력하고 설정 저장을 눌러 주세요.");
+  setAdminSettingsNotice("새 기수를 추가했습니다. 기수명을 입력하면 자동 저장됩니다.");
 }
 
 function bindCohortEntry(node) {
+  node.querySelectorAll("[data-cohort-field]").forEach((input) => {
+    if (input.type === "hidden") return;
+    input.addEventListener("input", () => scheduleAdminSettingsSave());
+    input.addEventListener("change", () => scheduleAdminSettingsSave());
+  });
   node.querySelectorAll("[data-move-cohort]").forEach((button) => {
     button.onclick = () => {
       moveConfigNode(node, button.dataset.moveCohort, "[data-cohort-entry]");
       refreshCohortOrders();
+      scheduleAdminSettingsSave("기수 순서를 자동 저장하는 중입니다.");
     };
   });
   node.querySelector(".remove-cohort").onclick = () => {
@@ -598,13 +615,26 @@ function bindCohortEntry(node) {
     }
     node.remove();
     refreshCohortOrders();
-    setAdminSettingsNotice("기수를 삭제했습니다. 설정 저장을 누르면 반영됩니다.");
+    scheduleAdminSettingsSave("기수 삭제 내용을 자동 저장하는 중입니다.");
   };
 }
 
-async function saveAdminSettings() {
+function scheduleAdminSettingsSave(message = "변경사항을 자동 저장하는 중입니다.") {
+  clearTimeout(adminSettingsSaveTimer);
+  setAdminSettingsNotice(message);
+  adminSettingsSaveTimer = setTimeout(() => {
+    saveAdminSettings({ rerender: false });
+  }, 700);
+}
+
+async function saveAdminSettings({ rerender = false } = {}) {
   const notice = document.querySelector("#adminSettingsNotice");
+  if (adminSettingsSaving) {
+    scheduleAdminSettingsSave("이전 저장이 끝나는 대로 다시 자동 저장합니다.");
+    return;
+  }
   try {
+    adminSettingsSaving = true;
     const cohorts = collectCohortsFromEditor();
     const creators = collectCreatorsFromEditor();
     const nextConfig = {
@@ -616,18 +646,24 @@ async function saveAdminSettings() {
         creators
       }
     };
-    notice.textContent = "관리자 설정을 저장하는 중입니다.";
+    if (notice) notice.textContent = "관리자 설정을 저장하는 중입니다.";
     const result = await api.saveConfig(currentAdminPin, nextConfig);
     if (result.ok === false) {
-      notice.textContent = result.message || "관리자 설정 저장에 실패했습니다.";
+      if (notice) notice.textContent = result.message || "관리자 설정 저장에 실패했습니다.";
       return;
     }
     config = normalizeConfig(result.config || nextConfig);
     api = createApi(config);
     currentSummary = await api.adminSummary(currentAdminPin);
-    renderDashboard(currentSummary, "관리자 설정 저장 완료. 신병 화면을 새로고침하면 반영됩니다.");
+    if (rerender) {
+      renderDashboard(currentSummary, "관리자 설정 저장 완료. 신병 화면을 새로고침하면 반영됩니다.");
+    } else {
+      setAdminSettingsNotice("자동 저장 완료. 신병 화면을 새로고침하면 반영됩니다.");
+    }
   } catch (error) {
-    notice.textContent = error.message || "관리자 설정 저장에 실패했습니다.";
+    if (notice) notice.textContent = error.message || "관리자 설정 저장에 실패했습니다.";
+  } finally {
+    adminSettingsSaving = false;
   }
 }
 
@@ -747,6 +783,7 @@ function resolveIssueDate(dailySummary) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedIssueDate)) {
     selectedIssueDate = dailySummary[0]?.date || formatDate(new Date());
   }
+  if (!visibleIssueMonth) visibleIssueMonth = monthKey(selectedIssueDate);
   return selectedIssueDate;
 }
 
@@ -872,18 +909,6 @@ function renderMobilePersonResults(summary, query) {
       </article>
     `;
   }).join("");
-}
-
-function renderKpiCard(label, value, unit, tone = "") {
-  return `
-    <article class="kpi-card ${tone}">
-      <div>
-        <span>${esc(label)}</span>
-        <strong>${Number(value || 0).toLocaleString("ko-KR")}${esc(unit)}</strong>
-        <p>현재 조회 기준</p>
-      </div>
-    </article>
-  `;
 }
 
 function renderLearningChart(learning) {
@@ -1264,6 +1289,17 @@ function parseLocalDate(value) {
   const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return new Date();
   return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+function monthKey(value) {
+  const date = parseLocalDate(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function shiftMonthKey(value, offset) {
+  const base = parseLocalDate(`${String(value || monthKey(formatDate(new Date()))).slice(0, 7)}-01`);
+  base.setMonth(base.getMonth() + Number(offset || 0));
+  return monthKey(formatDate(base));
 }
 
 function formatKoreanDateLabel(value) {

@@ -2209,14 +2209,6 @@ button:disabled {
   align-items: start;
 }
 
-.settings-save-button {
-  width: auto;
-  min-width: 160px;
-  min-height: 48px;
-  padding: 0 20px;
-  border-radius: 14px;
-}
-
 .admin-settings-grid .admin-section {
   margin-top: 0;
 }
@@ -2300,13 +2292,35 @@ button:disabled {
   white-space: nowrap;
 }
 
+.creator-showcase {
+  padding: 0 18px 14px;
+}
+
+.creator-showcase img {
+  display: block;
+  width: 100%;
+  max-height: 430px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(216, 229, 251, 0.38);
+  border-radius: 18px;
+  object-fit: cover;
+  box-shadow: 0 22px 44px rgba(8, 18, 37, 0.18);
+}
+
 .creator-editor {
   padding: 0 18px 18px;
 }
 
+.creator-editor label {
+  display: grid;
+  gap: 8px;
+  color: var(--blue-dark);
+  font-weight: 950;
+}
+
 .creator-editor textarea {
   width: 100%;
-  min-height: 142px;
+  min-height: 112px;
   resize: vertical;
   border: 2px solid #d8e5fb;
   border-radius: 16px;
@@ -2550,7 +2564,7 @@ button:disabled {
 
 .desktop-dashboard[data-desktop-view="dashboard"] .dashboard-canvas {
   display: grid;
-  grid-template-rows: auto minmax(98px, 0.17fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
   overflow: hidden;
 }
@@ -2642,22 +2656,14 @@ button:disabled {
   width: 24px;
 }
 
-.dashboard-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  min-height: 0;
-}
-
 .dashboard-analytics-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-template-rows: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   min-height: 0;
 }
 
-.kpi-card,
 .dashboard-panel,
 .desktop-dashboard .admin-section {
   border: 1px solid #d8e5fb;
@@ -2666,52 +2672,8 @@ button:disabled {
   box-shadow: 0 22px 46px rgba(41, 79, 174, 0.1);
 }
 
-.kpi-card {
-  position: relative;
-  min-height: 98px;
-  padding: 14px;
-  overflow: hidden;
-}
-
-.kpi-card.primary {
-  color: var(--blue-dark);
-  background: linear-gradient(135deg, #ffffff 0%, #e8f0ff 100%);
-}
-
-.kpi-card.success {
-  background: linear-gradient(135deg, #ffffff 0%, #eaffef 100%);
-}
-
-.kpi-card.danger {
-  background: linear-gradient(135deg, #ffffff 0%, #fff0f3 100%);
-}
-
-.kpi-card span,
-.kpi-card p {
-  margin: 0;
-  color: #637088;
-  font-weight: 850;
-}
-
-.kpi-card.primary span,
-.kpi-card.primary p {
-  color: #637088;
-}
-
-.kpi-card strong {
-  display: block;
-  margin: 10px 0 6px;
-  color: var(--blue-dark);
-  font-size: clamp(1.55rem, 2.1vw, 2.12rem);
-  line-height: 1;
-}
-
-.kpi-card.primary strong {
-  color: var(--blue);
-}
-
 .learning-panel {
-  grid-column: span 5;
+  grid-column: span 4;
   grid-row: span 2;
   min-height: 0;
 }
@@ -2722,19 +2684,19 @@ button:disabled {
 }
 
 .exchange-panel {
-  grid-column: span 3;
+  grid-column: span 4;
   min-height: 0;
 }
 
 .round-panel {
-  grid-column: span 7;
+  grid-column: span 8;
   min-height: 0;
 }
 
 .dashboard-panel {
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  padding: 15px;
   min-height: 0;
   overflow: hidden;
 }
@@ -3097,8 +3059,9 @@ button:disabled {
 
 .issue-date-dashboard {
   display: grid;
-  grid-template-columns: minmax(320px, 0.86fr) minmax(0, 1.14fr);
-  gap: 14px;
+  grid-template-columns: minmax(280px, 360px) minmax(300px, 420px);
+  gap: 12px;
+  align-items: start;
 }
 
 .issue-calendar-card,
@@ -3110,7 +3073,7 @@ button:disabled {
 }
 
 .issue-calendar-card {
-  padding: 16px;
+  padding: 14px;
 }
 
 .issue-calendar-card header,
@@ -3136,25 +3099,40 @@ button:disabled {
   font-weight: 850;
 }
 
-.issue-calendar-card header button {
-  min-height: 38px;
+.calendar-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #eef5ff;
+}
+
+.calendar-nav button {
+  min-width: 34px;
+  min-height: 34px;
   border: 0;
   border-radius: 999px;
-  padding: 0 14px;
+  padding: 0 11px;
+  color: var(--blue);
+  background: #ffffff;
+  font-weight: 950;
+}
+
+.calendar-nav button[data-calendar-date] {
   color: #ffffff;
   background: var(--blue);
-  font-weight: 950;
 }
 
 .calendar-weekdays,
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 7px;
+  gap: 5px;
 }
 
 .calendar-weekdays {
-  margin: 16px 0 8px;
+  margin: 12px 0 6px;
 }
 
 .calendar-weekdays span {
@@ -3166,8 +3144,8 @@ button:disabled {
 
 .calendar-grid button,
 .calendar-empty {
-  min-height: 48px;
-  border-radius: 14px;
+  min-height: 40px;
+  border-radius: 12px;
 }
 
 .calendar-grid button {
@@ -3208,33 +3186,33 @@ button:disabled {
 
 .issue-date-card {
   display: grid;
-  gap: 16px;
-  padding: 18px;
+  gap: 12px;
+  padding: 14px;
 }
 
 .issue-date-card header b {
   display: grid;
   place-items: center;
-  min-width: 76px;
-  min-height: 54px;
-  border-radius: 18px;
+  min-width: 64px;
+  min-height: 46px;
+  border-radius: 15px;
   color: var(--blue);
   background: #eef5ff;
-  font-size: 1.45rem;
+  font-size: 1.22rem;
 }
 
 .issue-date-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .issue-date-metrics div {
   display: grid;
   gap: 6px;
-  min-height: 86px;
-  padding: 14px;
-  border-radius: 18px;
+  min-height: 66px;
+  padding: 10px;
+  border-radius: 14px;
   background: #f6f9ff;
 }
 
@@ -3245,7 +3223,7 @@ button:disabled {
 
 .issue-date-metrics strong {
   color: var(--blue-dark);
-  font-size: 1.35rem;
+  font-size: 1.08rem;
   font-weight: 950;
 }
 
@@ -3295,7 +3273,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 78px;
+  min-height: 66px;
   padding: 14px 16px 14px 20px;
 }
 
@@ -3318,12 +3296,6 @@ button:disabled {
 
 .issue-accordion-toggle strong {
   font-size: 1.25rem;
-}
-
-.issue-accordion-toggle small {
-  color: #637088;
-  font-size: 0.9rem;
-  font-weight: 850;
 }
 
 .issue-accordion-actions {
@@ -3612,10 +3584,6 @@ button:disabled {
     overflow: auto;
   }
 
-  .dashboard-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .dashboard-analytics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: auto;
@@ -3811,10 +3779,6 @@ button:disabled {
   .admin-settings-grid .system-flow-panel,
   .admin-settings-grid .learning-flow-panel {
     grid-column: auto;
-  }
-
-  .settings-save-button {
-    width: 100%;
   }
 
   .flow-lane {
