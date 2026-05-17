@@ -3,7 +3,7 @@ import { createApi } from "./api.js";
 
 const app = document.querySelector("#adminApp");
 const UNIT_MARK_SRC = "assets/brand/unit-mark.svg";
-const CREATOR_IMAGE_SRC = "assets/brand/ai-tf-creators-112.png";
+const CREATOR_IMAGE_SRC = "assets/brand/ai-tf-creators-113.png";
 let config;
 let api;
 let currentSummary;
@@ -408,7 +408,7 @@ function renderCohortEntry(cohort, index) {
 
 function renderCreatorPanel() {
   return `
-    <section class="admin-section creator-panel">
+    <section class="creator-panel">
       <div class="creator-showcase">
         <img src="${esc(CREATOR_IMAGE_SRC)}" alt="제32보병사단 AI TF 제작진" loading="lazy" />
       </div>

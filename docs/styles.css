@@ -2254,10 +2254,13 @@ button:disabled {
 }
 
 .admin-settings-grid .pin-editor,
-.admin-settings-grid .creator-panel,
 .admin-settings-grid .system-flow-panel,
 .admin-settings-grid .learning-flow-panel,
 .admin-settings-grid .reset-panel {
+  grid-column: 1 / -1;
+}
+
+.admin-settings-grid .creator-panel {
   grid-column: 1 / -1;
 }
 
@@ -2339,18 +2342,18 @@ button:disabled {
 }
 
 .creator-showcase {
-  padding: 16px 18px 20px;
+  padding: 0;
 }
 
 .creator-showcase img {
   display: block;
   width: 100%;
   height: auto;
-  border: 1px solid rgba(216, 229, 251, 0.38);
-  border-radius: 18px;
+  border: 1px solid rgba(216, 229, 251, 0.7);
+  border-radius: 22px;
   object-fit: contain;
-  background: #ffffff;
-  box-shadow: 0 22px 44px rgba(8, 18, 37, 0.18);
+  background: transparent;
+  box-shadow: 0 22px 46px rgba(41, 79, 174, 0.12);
 }
 
 .flow-lane {
