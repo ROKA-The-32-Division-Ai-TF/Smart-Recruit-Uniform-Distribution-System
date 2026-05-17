@@ -2727,6 +2727,7 @@ button:disabled {
   gap: 14px;
   align-items: start;
   margin-bottom: 14px;
+  flex: 0 0 auto;
 }
 
 .panel-title h2 {
@@ -2735,10 +2736,24 @@ button:disabled {
   font-size: 1.08rem;
 }
 
+.panel-title p {
+  margin: 4px 0 0;
+  color: #637088;
+  font-size: 0.86rem;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
 .panel-title span {
+  flex: 0 0 auto;
+  min-height: 30px;
+  border-radius: 999px;
+  padding: 6px 11px;
   color: #6b778f;
+  background: #eef5ff;
   font-size: 0.86rem;
   font-weight: 900;
+  white-space: nowrap;
 }
 
 .empty-chart {
@@ -2782,12 +2797,14 @@ button:disabled {
 
 .learning-chart.large {
   flex: 1;
-  align-content: stretch;
+  grid-template-rows: minmax(150px, 1fr) auto auto;
+  align-content: start;
+  min-height: 0;
 }
 
 .learning-chart.large svg {
-  height: min(38vh, 315px);
-  min-height: 230px;
+  height: clamp(150px, 28vh, 260px);
+  min-height: 150px;
 }
 
 .learning-chart.large .learning-stats {

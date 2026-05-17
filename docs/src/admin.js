@@ -156,8 +156,11 @@ function renderDesktopOverview(summary) {
       </article>
       <article class="dashboard-panel learning-graph-panel">
         <div class="panel-title">
-          <h2>학습 기준값 변화</h2>
-          <span>전체 학습 데이터</span>
+          <div>
+            <h2>학습 기준값 변화</h2>
+            <p>전체 학습 데이터 기준으로 추천 기준 a값이 어떻게 움직이는지 보여줍니다.</p>
+          </div>
+          <span>현재 a ${Number(learning.currentA || 24).toFixed(2)}</span>
         </div>
         ${renderLearningChart(learning, "large")}
       </article>
