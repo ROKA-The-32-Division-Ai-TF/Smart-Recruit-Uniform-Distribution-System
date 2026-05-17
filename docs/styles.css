@@ -1693,61 +1693,10 @@ button:disabled {
   padding: 0 14px;
 }
 
-.config-command-bar {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(150px, 1fr));
-  gap: 12px;
-  padding: 18px 18px 12px;
-}
-
-.config-command-button {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 58px;
-  border: 1px solid #d8e5fb;
-  border-radius: 18px;
-  padding: 0 16px;
-  color: var(--blue-dark);
-  background: linear-gradient(180deg, #ffffff, #f5f9ff);
-  box-shadow: 0 12px 24px rgba(41, 79, 174, 0.08);
-  text-align: left;
-  cursor: pointer;
-}
-
-.config-command-button span {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  color: var(--blue);
-  background: #eef4ff;
-  font-size: 1.1rem;
-  font-weight: 950;
-}
-
-.config-command-button strong {
-  font-size: 0.98rem;
-  font-weight: 950;
-}
-
-.config-command-button.primary {
-  color: #ffffff;
-  border-color: var(--blue);
-  background: linear-gradient(135deg, var(--blue), #17377d);
-}
-
-.config-command-button.primary span {
-  color: var(--blue);
-  background: #ffffff;
-}
-
 .config-notice {
   min-height: 22px;
   margin: 0;
-  padding: 0 18px 14px;
+  padding: 18px 18px 14px;
   color: var(--accent);
   font-weight: 900;
 }
@@ -1817,6 +1766,53 @@ button:disabled {
 
 .config-stage-body[hidden] {
   display: none;
+}
+
+.config-stage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 2px 0 4px;
+}
+
+.stage-action-button {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 1px solid #d8e5fb;
+  border-radius: 999px;
+  padding: 0 16px 0 10px;
+  color: var(--blue-dark);
+  background: #ffffff;
+  box-shadow: 0 10px 22px rgba(41, 79, 174, 0.08);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 950;
+}
+
+.stage-action-button span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--blue);
+  background: #eef5ff;
+}
+
+.stage-action-button.primary {
+  color: #ffffff;
+  border-color: var(--blue);
+  background: linear-gradient(135deg, var(--blue), #17377d);
+}
+
+.stage-action-button.primary span {
+  color: var(--blue);
+  background: #ffffff;
 }
 
 .config-items {
@@ -2337,18 +2333,17 @@ button:disabled {
 }
 
 .creator-showcase {
-  padding: 18px;
+  padding: 16px 18px 20px;
 }
 
 .creator-showcase img {
   display: block;
   width: 100%;
-  max-height: 260px;
-  aspect-ratio: 21 / 6;
+  height: auto;
   border: 1px solid rgba(216, 229, 251, 0.38);
   border-radius: 18px;
   object-fit: contain;
-  background: linear-gradient(135deg, #ffffff, #f6f9ff);
+  background: #ffffff;
   box-shadow: 0 22px 44px rgba(8, 18, 37, 0.18);
 }
 
@@ -3867,7 +3862,6 @@ button:disabled {
     display: block;
   }
 
-  .config-command-bar,
   .config-card-head,
   .image-uploader,
   .image-actions,

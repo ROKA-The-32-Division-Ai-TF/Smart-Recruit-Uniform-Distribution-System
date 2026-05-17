@@ -3,7 +3,7 @@ import { createApi } from "./api.js";
 
 const app = document.querySelector("#adminApp");
 const UNIT_MARK_SRC = "assets/brand/unit-mark.svg";
-const CREATOR_IMAGE_SRC = "assets/brand/ai-tf-creators.png";
+const CREATOR_IMAGE_SRC = "assets/brand/ai-tf-creators-wide.png";
 let config;
 let api;
 let currentSummary;
@@ -25,7 +25,7 @@ let selectedMobileItemId = "all";
 let mobilePersonQuery = "";
 let draggedRoundItem = null;
 const expandedConfigItems = new Set();
-const collapsedConfigStages = new Set(["rounds", "composition", "items"]);
+const collapsedConfigStages = new Set(["cohorts", "rounds", "composition", "items"]);
 
 init();
 
@@ -113,7 +113,7 @@ function renderDashboard(summary, notice = "") {
     bindIssueControls();
     bindExcelFilters();
   }
-  if (activeDesktopView === "settings" && document.querySelector("#addConfigItem")) {
+  if (activeDesktopView === "settings") {
     bindConfigEditor();
   }
   if (activeDesktopView === "adminSettings") {
@@ -368,7 +368,10 @@ function renderCohortEditor() {
     className: "cohort-editor",
     title: "기수 설정",
     description: "신병 화면의 기수 선택 목록으로 바로 사용됩니다.",
-    action: `<button id="addCohort" class="secondary-button compact-button" type="button">기수 추가</button>`,
+    actions: `
+      <button class="stage-action-button" data-add-cohort type="button"><span>+</span><strong>기수 추가</strong></button>
+      <button class="stage-action-button primary" data-save-config type="button"><span>✓</span><strong>설정 저장</strong></button>
+    `,
     body: `
       <div id="cohortEntries" class="cohort-entry-list">
         ${(cohorts.length ? cohorts : [{ label: "", active: true }]).map((cohort, index) => renderCohortEntry(cohort, index)).join("")}
@@ -1538,20 +1541,6 @@ function uniqueOrdered(values) {
 function renderConfigEditor(notice = "") {
   return `
     <section class="admin-section config-section">
-      <div class="config-command-bar">
-        <button id="addConfigRound" class="config-command-button" type="button">
-          <span>+</span>
-          <strong>차수 추가</strong>
-        </button>
-        <button id="addConfigItem" class="config-command-button" type="button">
-          <span>+</span>
-          <strong>품목 추가</strong>
-        </button>
-        <button id="saveConfig" class="config-command-button primary" type="button">
-          <span>✓</span>
-          <strong>설정 저장</strong>
-        </button>
-      </div>
       <p id="configNotice" class="config-notice">${esc(notice)}</p>
       ${renderCohortEditor()}
       ${renderRoundEditor(config.rounds)}
@@ -1561,6 +1550,10 @@ function renderConfigEditor(notice = "") {
         className: "size-config-stage",
         title: "품목 / 사이즈표 관리",
         description: "품목을 열어서 이미지와 사이즈표를 수정합니다.",
+        actions: `
+          <button class="stage-action-button" data-add-config-item type="button"><span>+</span><strong>품목 추가</strong></button>
+          <button class="stage-action-button primary" data-save-config type="button"><span>✓</span><strong>설정 저장</strong></button>
+        `,
         body: `
         <div id="configItems" class="config-items">
           ${config.items.map((item) => renderConfigItem(item)).join("")}
@@ -1576,6 +1569,10 @@ function renderRoundEditor(rounds) {
     className: "round-editor",
     title: "불출 차수 설정",
     description: "예: 3차 불출, 4차 불출처럼 필요한 만큼 추가할 수 있습니다.",
+    actions: `
+      <button class="stage-action-button" data-add-config-round type="button"><span>+</span><strong>차수 추가</strong></button>
+      <button class="stage-action-button primary" data-save-config type="button"><span>✓</span><strong>설정 저장</strong></button>
+    `,
     body: `
       <div id="configRounds" class="round-entry-list">
         ${(rounds || []).map((round, index) => renderConfigRound(round, index)).join("")}
@@ -1583,7 +1580,7 @@ function renderRoundEditor(rounds) {
   });
 }
 
-function renderConfigStage({ id, className = "", title, description, body, action = "" }) {
+function renderConfigStage({ id, className = "", title, description, body, actions = "" }) {
   const collapsed = collapsedConfigStages.has(id);
   return `
     <section class="config-stage ${esc(className)} ${collapsed ? "collapsed" : ""}" data-config-stage="${esc(id)}">
@@ -1595,9 +1592,9 @@ function renderConfigStage({ id, className = "", title, description, body, actio
           </span>
           <b>${collapsed ? "열기" : "접기"}</b>
         </button>
-        ${action}
       </div>
       <div class="config-stage-body" ${collapsed ? "hidden" : ""}>
+        ${actions ? `<div class="config-stage-actions">${actions}</div>` : ""}
         ${body}
       </div>
     </section>
@@ -1681,6 +1678,9 @@ function renderRoundCompositionEditor(rounds, items) {
     className: "round-composition-editor",
     title: "차수별 구성 / 불출 순서 설정",
     description: "품목을 차수에 추가한 뒤 마우스로 끌어서 신병 화면 표시 순서를 바꿉니다.",
+    actions: `
+      <button class="stage-action-button primary" data-save-config type="button"><span>✓</span><strong>설정 저장</strong></button>
+    `,
     body: `
       <div id="roundCompositions" class="round-composition-list">
         ${(rounds || []).map((round) => renderRoundComposition(round, items)).join("")}
@@ -1717,31 +1717,10 @@ function renderRoundCompositionItem(item) {
 
 function bindConfigEditor() {
   bindConfigStageToggles();
-  document.querySelector("#addCohort")?.addEventListener("click", addCohortEntry);
-  document.querySelector("#addConfigRound").addEventListener("click", addConfigRound);
-  document.querySelector("#addConfigItem").addEventListener("click", () => {
-    expandConfigStage("items");
-    const container = document.querySelector("#configItems");
-    const itemId = `custom_${Date.now()}`;
-    const item = {
-      itemId,
-      label: "새 품목",
-      recommendationType: "manual",
-      image: "",
-      order: 0,
-      sizes: []
-    };
-    expandedConfigItems.add(itemId);
-    container.insertAdjacentHTML("afterbegin", renderConfigItem(item));
-    const node = container.firstElementChild;
-    bindConfigItem(node);
-    refreshConfigOrders();
-    refreshRoundCompositionEditor();
-    addItemToFirstRoundComposition(item);
-    node.scrollIntoView({ block: "start" });
-    node.querySelector('[data-field="label"]')?.focus();
-  });
-  document.querySelector("#saveConfig").addEventListener("click", saveConfigFromEditor);
+  document.querySelectorAll("[data-add-cohort]").forEach((button) => button.addEventListener("click", addCohortEntry));
+  document.querySelectorAll("[data-add-config-round]").forEach((button) => button.addEventListener("click", addConfigRound));
+  document.querySelectorAll("[data-add-config-item]").forEach((button) => button.addEventListener("click", addConfigItem));
+  document.querySelectorAll("[data-save-config]").forEach((button) => button.addEventListener("click", saveConfigFromEditor));
   document.querySelectorAll("[data-cohort-entry]").forEach(bindCohortEntry);
   document.querySelectorAll("[data-config-round]").forEach(bindConfigRound);
   document.querySelectorAll("[data-config-item]").forEach(bindConfigItem);
@@ -1797,6 +1776,30 @@ function addConfigRound() {
   refreshRoundCompositionEditor();
   setConfigNotice(`${round.label}을 추가했습니다. 아래 차수별 구성에서 품목을 넣어 주세요.`);
   container.lastElementChild.querySelector('[data-round-field="label"]')?.focus();
+}
+
+function addConfigItem() {
+  expandConfigStage("items");
+  const container = document.querySelector("#configItems");
+  const itemId = `custom_${Date.now()}`;
+  const item = {
+    itemId,
+    label: "새 품목",
+    recommendationType: "manual",
+    image: "",
+    order: 0,
+    sizes: []
+  };
+  expandedConfigItems.add(itemId);
+  container.insertAdjacentHTML("afterbegin", renderConfigItem(item));
+  const node = container.firstElementChild;
+  bindConfigItem(node);
+  refreshConfigOrders();
+  refreshRoundCompositionEditor();
+  addItemToFirstRoundComposition(item);
+  setConfigNotice("새 품목을 추가했습니다. 품목명과 사이즈표를 입력한 뒤 저장해 주세요.");
+  node.scrollIntoView({ block: "start" });
+  node.querySelector('[data-field="label"]')?.focus();
 }
 
 function bindConfigRound(node) {
