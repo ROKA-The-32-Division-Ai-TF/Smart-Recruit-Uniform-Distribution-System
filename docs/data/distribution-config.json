@@ -96,9 +96,9 @@
       "itemId": "combat_top",
       "label": "전투복 상의(하계/사계)",
       "recommendationType": "upper",
-      "image": "assets/mockups/combat-top.png",
-      "imagePosition": "center 35%",
-      "imageSize": "100% auto",
+      "image": "assets/items/combat-top.webp",
+      "imagePosition": "center",
+      "imageSize": "contain",
       "order": 10,
       "sizes": [
         "90-168",
@@ -123,9 +123,9 @@
       "itemId": "combat_bottom",
       "label": "전투복 하의(하계/사계)",
       "recommendationType": "lower",
-      "image": "assets/mockups/combat-bottom.png",
-      "imagePosition": "center 33%",
-      "imageSize": "100% auto",
+      "image": "assets/items/combat-bottom.webp",
+      "imagePosition": "center",
+      "imageSize": "contain",
       "order": 20,
       "sizes": [
         "75-168",
@@ -153,7 +153,7 @@
       "itemId": "winter_outer",
       "label": "방상외피",
       "recommendationType": "outer",
-      "image": "",
+      "image": "assets/items/winter-outer.webp",
       "order": 30,
       "sizes": [
         "85-170",
@@ -171,13 +171,15 @@
         "130-180",
         "140-185",
         "150-190"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "winter_inner",
       "label": "방상내피",
       "recommendationType": "inner",
-      "image": "",
+      "image": "assets/items/winter-inner.webp",
       "order": 40,
       "sizes": [
         "85-170",
@@ -195,13 +197,15 @@
         "130-180",
         "140-185",
         "150-190"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "combat_shirt",
       "label": "컴뱃셔츠",
       "recommendationType": "single_upper",
-      "image": "",
+      "image": "assets/items/combat-shirt.webp",
       "order": 50,
       "sizes": [
         "90",
@@ -212,13 +216,15 @@
         "115",
         "120",
         "125"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "combat_shoes",
       "label": "전투화(육면)",
       "recommendationType": "shoes",
-      "image": "",
+      "image": "assets/items/combat-shoes.webp",
       "order": 60,
       "sizes": [
         "240",
@@ -234,13 +240,15 @@
         "290",
         "295",
         "300"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "combat_shoes_leather",
       "label": "전투화(은면)",
       "recommendationType": "shoes",
-      "image": "",
+      "image": "assets/items/combat-shoes-leather.webp",
       "order": 70,
       "sizes": [
         "240",
@@ -256,13 +264,15 @@
         "290",
         "295",
         "300"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "sneakers",
       "label": "운동화",
       "recommendationType": "shoes",
-      "image": "",
+      "image": "assets/items/sneakers.webp",
       "order": 80,
       "sizes": [
         "240",
@@ -282,13 +292,15 @@
         "310",
         "315",
         "320"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "trail_running_shoes",
       "label": "트레일 런닝화",
       "recommendationType": "shoes",
-      "image": "",
+      "image": "assets/items/trail-running-shoes.webp",
       "order": 90,
       "sizes": [
         "240",
@@ -308,13 +320,15 @@
         "310",
         "315",
         "320"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "thermal_underwear",
       "label": "동내의",
       "recommendationType": "single_upper",
-      "image": "",
+      "image": "assets/items/thermal-underwear.webp",
       "order": 100,
       "sizes": [
         "90",
@@ -325,13 +339,15 @@
         "115",
         "120",
         "125"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "police_sweater",
       "label": "폴리스형 스웨터",
       "recommendationType": "single_upper",
-      "image": "",
+      "image": "assets/items/police-sweater.webp",
       "order": 110,
       "sizes": [
         "90",
@@ -342,13 +358,15 @@
         "115",
         "120",
         "125"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "padded_jacket",
       "label": "패딩",
       "recommendationType": "single_upper",
-      "image": "",
+      "image": "assets/items/padded-jacket.webp",
       "order": 120,
       "sizes": [
         "95",
@@ -358,13 +376,15 @@
         "115",
         "120",
         "125"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "summer_tracksuit",
       "label": "하계운동복",
       "recommendationType": "single_upper",
-      "image": "",
+      "image": "assets/items/summer-tracksuit.webp",
       "order": 130,
       "sizes": [
         "90",
@@ -375,13 +395,15 @@
         "115",
         "120",
         "125"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "spring_fall_tracksuit",
       "label": "춘추운동복",
       "recommendationType": "single_upper",
-      "image": "",
+      "image": "assets/items/spring-fall-tracksuit.webp",
       "order": 140,
       "sizes": [
         "90",
@@ -392,13 +414,15 @@
         "115",
         "120",
         "125"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "winter_tracksuit",
       "label": "동계운동복",
       "recommendationType": "single_upper",
-      "image": "",
+      "image": "assets/items/winter-tracksuit.webp",
       "order": 150,
       "sizes": [
         "90",
@@ -409,13 +433,15 @@
         "115",
         "120",
         "125"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "multifunction_cap",
       "label": "다기능작전모",
       "recommendationType": "head_sml",
-      "image": "",
+      "image": "assets/items/multifunction-cap.webp",
       "order": 160,
       "sizeRules": {
         "headRanges": [
@@ -437,13 +463,15 @@
         "소",
         "중",
         "대"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "combat_cap",
       "label": "전투모",
       "recommendationType": "head_sml",
-      "image": "",
+      "image": "assets/items/combat-cap.webp",
       "order": 170,
       "sizeRules": {
         "headRanges": [
@@ -465,13 +493,15 @@
         "소",
         "중",
         "대"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "beret",
       "label": "베레모",
       "recommendationType": "beret",
-      "image": "",
+      "image": "assets/items/beret.webp",
       "order": 180,
       "sizes": [
         "52",
@@ -485,15 +515,17 @@
         "60",
         "61",
         "62"
-      ]
+      ],
+      "imagePosition": "center",
+      "imageSize": "contain"
     },
     {
       "itemId": "field_jacket",
       "label": "야전상의",
       "recommendationType": "outer",
-      "image": "assets/mockups/field-jacket.png",
-      "imagePosition": "center 34%",
-      "imageSize": "100% auto",
+      "image": "assets/items/field-jacket.webp",
+      "imagePosition": "center",
+      "imageSize": "contain",
       "order": 190,
       "sizes": [
         "90-168",
@@ -523,9 +555,9 @@
       "itemId": "field_inner",
       "label": "야전내피",
       "recommendationType": "inner",
-      "image": "assets/mockups/field-inner.png",
-      "imagePosition": "center 34%",
-      "imageSize": "100% auto",
+      "image": "assets/items/field-inner.webp",
+      "imagePosition": "center",
+      "imageSize": "contain",
       "order": 200,
       "sizes": [
         "90-168",

@@ -668,9 +668,11 @@ function renderItemVisual(item) {
   if (item.image) {
     const isMockupImage = String(item.image).includes("assets/mockups/");
     const visualPosition = isMockupImage ? "center 35%" : item.imagePosition || "center";
-    const visualSize = isMockupImage ? "160% auto" : item.imageSize || "contain";
+    const visualFit = isMockupImage ? "cover" : item.imageSize || "contain";
     return `
-      <div class="item-visual image-visual" style="--visual-image: url('${esc(item.image)}'); --visual-position: ${esc(visualPosition)}; --visual-size: ${esc(visualSize)};"></div>
+      <figure class="item-visual image-visual" style="--visual-position: ${esc(visualPosition)}; --visual-fit: ${esc(visualFit)};">
+        <img src="${esc(item.image)}" alt="${esc(item.label)} 이미지" loading="eager" />
+      </figure>
     `;
   }
   return `

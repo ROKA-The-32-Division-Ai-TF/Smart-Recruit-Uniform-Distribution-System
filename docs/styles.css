@@ -491,7 +491,7 @@ button:disabled {
   background-image: var(--visual-image);
   background-repeat: no-repeat;
   background-position: var(--visual-position);
-  background-size: 240% auto;
+  background-size: var(--visual-size, contain);
 }
 
 .card-boot-icon {
@@ -824,10 +824,18 @@ button:disabled {
 }
 
 .image-visual {
-  background-image: var(--visual-image);
-  background-repeat: no-repeat;
-  background-position: var(--visual-position);
-  background-size: var(--visual-size);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 26px;
+  background: #fff;
+}
+
+.image-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: var(--visual-fit, contain);
+  object-position: var(--visual-position, center);
 }
 
 .boot-visual {

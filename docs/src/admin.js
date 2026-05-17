@@ -2093,7 +2093,7 @@ function bindImageUploader(node) {
       if (imagePositionInput) imagePositionInput.value = "center";
       if (imageSizeInput) imageSizeInput.value = "contain";
       renderImagePreview(node, imageInput.value);
-      setConfigNotice("이미지를 첨부했습니다. 설정 저장을 누르면 반영됩니다.");
+      setConfigNotice("이미지를 웹용으로 최적화했습니다. 설정 저장을 누르면 반영됩니다.");
     } catch (error) {
       setConfigNotice(error.message || "이미지를 첨부하지 못했습니다.");
     }
@@ -2132,43 +2132,60 @@ function renderImagePreview(node, image) {
   node.querySelector("[data-image-preview]").innerHTML = renderImagePreviewMarkup(image);
 }
 
-function readImageFile(file) {
-  if (!file.type.startsWith("image/")) {
+async function readImageFile(file) {
+  const buffer = await file.arrayBuffer();
+  const mimeType = sniffImageMime(buffer, file.type);
+  if (!mimeType.startsWith("image/")) {
     return Promise.reject(new Error("이미지 파일만 첨부할 수 있습니다."));
   }
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        resolve(await resizeImageIfNeeded(String(reader.result), file.type));
-      } catch {
-        resolve(String(reader.result));
-      }
-    };
-    reader.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
-    reader.readAsDataURL(file);
-  });
+  const dataUrl = arrayBufferToDataUrl(buffer, mimeType);
+  return resizeImageIfNeeded(dataUrl, mimeType);
 }
 
 function resizeImageIfNeeded(dataUrl, mimeType) {
-  if (dataUrl.length < 700000 || mimeType === "image/gif" || mimeType === "image/svg+xml") {
+  if (mimeType === "image/gif" || mimeType === "image/svg+xml") {
     return Promise.resolve(dataUrl);
   }
   return new Promise((resolve) => {
     const image = new Image();
     image.onload = () => {
-      const maxSide = 1100;
+      if (mimeType === "image/webp" && dataUrl.length < 140000 && Math.max(image.width, image.height) <= 900) {
+        resolve(dataUrl);
+        return;
+      }
+      const maxSide = 900;
       const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.round(image.width * scale));
       canvas.height = Math.max(1, Math.round(image.height * scale));
       const context = canvas.getContext("2d");
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL(mimeType === "image/jpeg" ? "image/jpeg" : "image/webp", 0.86));
+      resolve(canvas.toDataURL("image/webp", 0.82));
     };
     image.onerror = () => resolve(dataUrl);
     image.src = dataUrl;
   });
+}
+
+function sniffImageMime(buffer, fallback = "") {
+  const bytes = new Uint8Array(buffer);
+  const ascii = (start, length) => String.fromCharCode(...bytes.slice(start, start + length));
+  if (bytes[0] === 0x89 && ascii(1, 3) === "PNG") return "image/png";
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (ascii(0, 3) === "GIF") return "image/gif";
+  if (ascii(0, 4) === "RIFF" && ascii(8, 4) === "WEBP") return "image/webp";
+  if (String(fallback || "").startsWith("image/")) return fallback;
+  return "application/octet-stream";
+}
+
+function arrayBufferToDataUrl(buffer, mimeType) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.slice(index, index + chunkSize));
+  }
+  return `data:${mimeType};base64,${btoa(binary)}`;
 }
 
 function setConfigNotice(message) {
