@@ -25,6 +25,7 @@ let selectedMobileItemId = "all";
 let mobilePersonQuery = "";
 let draggedRoundItem = null;
 const expandedConfigItems = new Set();
+const collapsedConfigStages = new Set(["rounds", "composition", "items"]);
 
 init();
 
@@ -91,7 +92,7 @@ function renderDashboard(summary, notice = "") {
             </div>
           </div>
           <nav class="desktop-nav" aria-label="관리자 화면 전환">
-            ${renderNavButton("issues", "불출현황")}
+            ${renderNavButton("issues", "불출 현황")}
             ${renderNavButton("settings", "불출 설정")}
             ${renderNavButton("dashboard", "인공지능 학습")}
             ${renderNavButton("adminSettings", "관리자 설정")}
@@ -177,7 +178,7 @@ function renderIssueView(issueSummary, dailySummary) {
   `;
 }
 
-// 달력은 상시 노출하지 않고 팝업으로만 띄워 불출현황 첫 화면의 공간을 확보한다.
+// 달력은 상시 노출하지 않고 팝업으로만 띄워 불출 현황 첫 화면의 공간을 확보한다.
 function renderIssueDateModal(dailySummary, selectedDate) {
   return `
     <div class="issue-date-modal-backdrop" data-close-issue-date>
@@ -362,20 +363,17 @@ function renderPinEditor() {
 
 function renderCohortEditor() {
   const cohorts = config.cohorts?.length ? config.cohorts : [];
-  return `
-    <section class="config-stage cohort-editor">
-      <div class="config-stage-head">
-        <div>
-          <h3>기수 설정</h3>
-          <p>신병 화면의 기수 선택 목록으로 바로 사용됩니다.</p>
-        </div>
-        <button id="addCohort" class="secondary-button compact-button" type="button">기수 추가</button>
-      </div>
+  return renderConfigStage({
+    id: "cohorts",
+    className: "cohort-editor",
+    title: "기수 설정",
+    description: "신병 화면의 기수 선택 목록으로 바로 사용됩니다.",
+    action: `<button id="addCohort" class="secondary-button compact-button" type="button">기수 추가</button>`,
+    body: `
       <div id="cohortEntries" class="cohort-entry-list">
         ${(cohorts.length ? cohorts : [{ label: "", active: true }]).map((cohort, index) => renderCohortEntry(cohort, index)).join("")}
-      </div>
-    </section>
-  `;
+      </div>`
+  });
 }
 
 function renderCohortEntry(cohort, index) {
@@ -403,12 +401,6 @@ function renderCohortEntry(cohort, index) {
 function renderCreatorPanel() {
   return `
     <section class="admin-section creator-panel">
-      <div class="section-head">
-        <div>
-          <h2>만든 사람들</h2>
-          <p>제32보병사단 AI TF 제작진 표기입니다.</p>
-        </div>
-      </div>
       <div class="creator-showcase">
         <img src="${esc(CREATOR_IMAGE_SRC)}" alt="제32보병사단 AI TF 제작진" loading="lazy" />
       </div>
@@ -606,6 +598,7 @@ function bindAdminSettingsEditor() {
 }
 
 function addCohortEntry() {
+  expandConfigStage("cohorts");
   const container = document.querySelector("#cohortEntries");
   const nextNumber = container.querySelectorAll("[data-cohort-entry]").length + 1;
   const cohort = {
@@ -1563,32 +1556,49 @@ function renderConfigEditor(notice = "") {
       ${renderCohortEditor()}
       ${renderRoundEditor(config.rounds)}
       ${renderRoundCompositionEditor(config.rounds, config.items)}
-      <section class="config-stage size-config-stage">
-        <div class="config-stage-head">
-          <div>
-            <h3>품목 / 사이즈표 관리</h3>
-            <p>품목을 열어서 이미지와 사이즈표를 수정합니다.</p>
-          </div>
-        </div>
+      ${renderConfigStage({
+        id: "items",
+        className: "size-config-stage",
+        title: "품목 / 사이즈표 관리",
+        description: "품목을 열어서 이미지와 사이즈표를 수정합니다.",
+        body: `
         <div id="configItems" class="config-items">
           ${config.items.map((item) => renderConfigItem(item)).join("")}
-        </div>
-      </section>
+        </div>`
+      })}
     </section>
   `;
 }
 
 function renderRoundEditor(rounds) {
-  return `
-    <section class="config-stage round-editor">
-      <div class="config-stage-head">
-        <div>
-          <h3>불출 차수 설정</h3>
-          <p>예: 3차 불출, 4차 불출처럼 필요한 만큼 추가할 수 있습니다.</p>
-        </div>
-      </div>
+  return renderConfigStage({
+    id: "rounds",
+    className: "round-editor",
+    title: "불출 차수 설정",
+    description: "예: 3차 불출, 4차 불출처럼 필요한 만큼 추가할 수 있습니다.",
+    body: `
       <div id="configRounds" class="round-entry-list">
         ${(rounds || []).map((round, index) => renderConfigRound(round, index)).join("")}
+      </div>`
+  });
+}
+
+function renderConfigStage({ id, className = "", title, description, body, action = "" }) {
+  const collapsed = collapsedConfigStages.has(id);
+  return `
+    <section class="config-stage ${esc(className)} ${collapsed ? "collapsed" : ""}" data-config-stage="${esc(id)}">
+      <div class="config-stage-head">
+        <button class="config-stage-toggle" data-config-stage-toggle="${esc(id)}" type="button" aria-expanded="${collapsed ? "false" : "true"}">
+          <span>
+            <h3>${esc(title)}</h3>
+            <p>${esc(description)}</p>
+          </span>
+          <b>${collapsed ? "열기" : "접기"}</b>
+        </button>
+        ${action}
+      </div>
+      <div class="config-stage-body" ${collapsed ? "hidden" : ""}>
+        ${body}
       </div>
     </section>
   `;
@@ -1666,19 +1676,16 @@ function renderConfigItem(item) {
 }
 
 function renderRoundCompositionEditor(rounds, items) {
-  return `
-    <section class="config-stage round-composition-editor">
-      <div class="config-stage-head">
-        <div>
-          <h3>차수별 구성 / 불출 순서 설정</h3>
-          <p>품목을 차수에 추가한 뒤 마우스로 끌어서 신병 화면 표시 순서를 바꿉니다.</p>
-        </div>
-      </div>
+  return renderConfigStage({
+    id: "composition",
+    className: "round-composition-editor",
+    title: "차수별 구성 / 불출 순서 설정",
+    description: "품목을 차수에 추가한 뒤 마우스로 끌어서 신병 화면 표시 순서를 바꿉니다.",
+    body: `
       <div id="roundCompositions" class="round-composition-list">
         ${(rounds || []).map((round) => renderRoundComposition(round, items)).join("")}
-      </div>
-    </section>
-  `;
+      </div>`
+  });
 }
 
 function renderRoundComposition(round, items) {
@@ -1709,9 +1716,11 @@ function renderRoundCompositionItem(item) {
 }
 
 function bindConfigEditor() {
+  bindConfigStageToggles();
   document.querySelector("#addCohort")?.addEventListener("click", addCohortEntry);
   document.querySelector("#addConfigRound").addEventListener("click", addConfigRound);
   document.querySelector("#addConfigItem").addEventListener("click", () => {
+    expandConfigStage("items");
     const container = document.querySelector("#configItems");
     const itemId = `custom_${Date.now()}`;
     const item = {
@@ -1739,7 +1748,40 @@ function bindConfigEditor() {
   bindRoundCompositionEditor();
 }
 
+function bindConfigStageToggles() {
+  document.querySelectorAll("[data-config-stage-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.dataset.configStageToggle;
+      setConfigStageCollapsed(id, !collapsedConfigStages.has(id));
+    });
+  });
+}
+
+function expandConfigStage(id) {
+  setConfigStageCollapsed(id, false);
+}
+
+function setConfigStageCollapsed(id, collapsed) {
+  if (!id) return;
+  if (collapsed) {
+    collapsedConfigStages.add(id);
+  } else {
+    collapsedConfigStages.delete(id);
+  }
+  const stage = document.querySelector(`[data-config-stage="${cssEscape(id)}"]`);
+  if (!stage) return;
+  const body = stage.querySelector(".config-stage-body");
+  const toggle = stage.querySelector("[data-config-stage-toggle]");
+  stage.classList.toggle("collapsed", collapsed);
+  if (body) body.hidden = collapsed;
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    toggle.querySelector("b").textContent = collapsed ? "열기" : "접기";
+  }
+}
+
 function addConfigRound() {
+  expandConfigStage("rounds");
   const rounds = readRoundEditorEntries();
   const nextNumber = nextRoundNumber(rounds);
   const round = {
