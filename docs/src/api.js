@@ -19,9 +19,10 @@ export function createApi(config) {
       if (useLocalMock) return { ok: true, mode: "local", initialized: true };
       return postAppsScript(appsScriptUrl, "initialize", { adminPin });
     },
-    async getStatus(recruitNo) {
-      if (useLocalMock) return mockGetStatus(config, recruitNo);
+    async getStatus(recruitNo, cohort = "") {
+      if (useLocalMock) return mockGetStatus(config, recruitNo, cohort);
       const result = await postAppsScript(appsScriptUrl, "getStatus", {
+        cohort,
         recruitNo,
         roundIds: config.rounds.map((round) => round.roundId)
       });
@@ -52,6 +53,10 @@ export function createApi(config) {
       }
       return postAppsScript(appsScriptUrl, "saveConfig", { adminPin, config: nextConfig });
     },
+    async changeAdminPin(currentPin, nextPin) {
+      if (useLocalMock) return { ok: true, message: "로컬 모드에서는 PIN 변경을 저장하지 않습니다." };
+      return postAppsScript(appsScriptUrl, "changeAdminPin", { adminPin: currentPin, nextPin });
+    },
     listPending() {
       return readJson(PENDING_KEY, []);
     },
@@ -63,15 +68,16 @@ export function createApi(config) {
 }
 
 export function buildSubmissionPayload({ config, round, profile, issueItems }) {
-  const submissionId = `${profile.recruitNo}-${round.roundId}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const submissionId = `${profile.cohort || "cohort"}-${profile.recruitNo}-${round.roundId}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
   return {
     submissionId,
+    cohort: profile.cohort,
     recruitNo: profile.recruitNo,
-    height: profile.height,
-    weight: profile.weight,
-    footSize: profile.footSize,
-    headSize: profile.headSize,
-    bmi: profile.bmi,
+    height: "",
+    weight: "",
+    bmi: "",
+    footSize: "",
+    headSize: "",
     configVersion: config.configVersion,
     roundId: round.roundId,
     roundName: round.label,
@@ -82,7 +88,10 @@ export function buildSubmissionPayload({ config, round, profile, issueItems }) {
       finalSize: item.finalSize,
       changed: item.recommendation.inputMode !== "direct" && item.finalSize !== item.recommendation.recommendedSize,
       changeReason: item.changeReason || ""
-    }))
+    })),
+    learningItems: issueItems
+      .filter((item) => item.recommendation.inputMode !== "direct")
+      .map((item) => buildLearningItem(item, profile, config, round))
   };
 }
 
@@ -107,8 +116,11 @@ async function postAppsScript(url, action, payload) {
   return data;
 }
 
-function mockGetStatus(config, recruitNo) {
-  const rows = readRecords(config).filter((row) => row.recruit_no === String(recruitNo));
+function mockGetStatus(config, recruitNo, cohort = "") {
+  const rows = readRecords(config).filter((row) =>
+    String(row.recruit_no) === String(recruitNo) &&
+    String(row.cohort || "") === String(cohort || "")
+  );
   const completedRoundIds = [...new Set(rows.map((row) => row.round_id))];
   const next = getNextRound(config, { completedRoundIds });
   return {
@@ -129,6 +141,7 @@ function mockSubmitIssue(config, payload) {
 
   const duplicateRoundRows = records.filter((row) =>
     String(row.recruit_no) === String(payload.recruitNo) &&
+    String(row.cohort || "") === String(payload.cohort || "") &&
     String(row.round_id) === String(payload.roundId)
   );
   if (duplicateRoundRows.length) {
@@ -139,10 +152,11 @@ function mockSubmitIssue(config, payload) {
   const rows = payload.items.map((item) => ({
     submission_id: payload.submissionId,
     timestamp,
+    cohort: String(payload.cohort || ""),
     recruit_no: String(payload.recruitNo),
-    height_cm: Number(payload.height),
-    weight_kg: Number(payload.weight),
-    bmi: Number(payload.bmi),
+    height_cm: "",
+    weight_kg: "",
+    bmi: "",
     round_id: payload.roundId,
     round_name: payload.roundName,
     item_id: item.itemId,
@@ -156,6 +170,25 @@ function mockSubmitIssue(config, payload) {
     head_size: Number(payload.headSize) || ""
   }));
   writeRecords([...records, ...rows]);
+  writeJson("sruds_learning_v1", [
+    ...readJson("sruds_learning_v1", []),
+    ...(payload.learningItems || []).map((item) => ({
+      timestamp,
+      cohort: String(payload.cohort || ""),
+      round_id: payload.roundId,
+      round_name: payload.roundName,
+      item_id: item.itemId,
+      item_name: item.itemName,
+      recommendation_type: item.recommendationType,
+      recommended_size: item.recommendedSize,
+      final_size: item.finalSize,
+      changed: item.changed ? "Y" : "N",
+      size_delta: item.sizeDelta,
+      bmi_bucket: item.bmiBucket,
+      dis_bucket: item.disBucket,
+      config_version: item.configVersion || config.configVersion
+    }))
+  ]);
   return { ok: true, duplicate: false, records: rows };
 }
 
@@ -188,13 +221,10 @@ function buildSummary(config, records) {
     if (row.changed === "Y" || row.changed === true) sizeEntry.changedCount += 1;
     bySize.set(sizeKey, sizeEntry);
 
-    const personKey = [row.recruit_no, row.round_id].join("|");
+    const personKey = [row.cohort || "", row.recruit_no, row.round_id].join("|");
     const person = byPerson.get(personKey) || {
+      cohort: row.cohort || "",
       recruitNo: row.recruit_no,
-      height: row.height_cm,
-      weight: row.weight_kg,
-      footSize: row.foot_size,
-      headSize: row.head_size,
       roundId: row.round_id,
       roundName: row.round_name,
       changedCount: 0,
@@ -205,7 +235,7 @@ function buildSummary(config, records) {
     byPerson.set(personKey, person);
 
     const roundPeople = completedPeopleByRound.get(row.round_id) || new Set();
-    roundPeople.add(row.recruit_no);
+    roundPeople.add(`${row.cohort || ""}|${row.recruit_no}`);
     completedPeopleByRound.set(row.round_id, roundPeople);
   });
 
@@ -219,15 +249,82 @@ function buildSummary(config, records) {
   return {
     overview: {
       totalItems: records.length,
-      totalPeople: new Set(records.map((row) => row.recruit_no)).size,
+      totalPeople: new Set(records.map((row) => `${row.cohort || ""}|${row.recruit_no}`)).size,
       changedItems,
       exchangeRate: records.length ? Number(((changedItems / records.length) * 100).toFixed(1)) : 0,
       completedRounds
     },
     sizeSummary: [...bySize.values()].sort(summarySorter),
     personColumns,
-    personSummary: [...byPerson.values()].sort((a, b) => String(a.recruitNo).localeCompare(String(b.recruitNo), "ko") || String(a.roundId).localeCompare(String(b.roundId), "ko")),
+    personSummary: [...byPerson.values()].sort((a, b) => String(a.cohort || "").localeCompare(String(b.cohort || ""), "ko") || String(a.recruitNo).localeCompare(String(b.recruitNo), "ko") || String(a.roundId).localeCompare(String(b.roundId), "ko")),
+    learningSummary: buildLearningSummary(readJson("sruds_learning_v1", [])),
     records
+  };
+}
+
+function buildLearningItem(item, profile, config, round) {
+  const recommended = String(item.recommendation.recommendedSize || "");
+  const finalSize = String(item.finalSize || "");
+  return {
+    cohort: profile.cohort,
+    roundId: round.roundId,
+    itemId: item.itemId,
+    itemName: item.label,
+    recommendationType: item.recommendationType || "manual",
+    recommendedSize: recommended,
+    finalSize,
+    changed: item.recommendation.inputMode !== "direct" && recommended && finalSize && recommended !== finalSize,
+    sizeDelta: sizeDelta(recommended, finalSize),
+    bmiBucket: bucket(profile.bmi, 0.5),
+    disBucket: bucket(profile.weight - expectedWeight(profile.height), 5),
+    configVersion: config.configVersion
+  };
+}
+
+function sizeDelta(recommended, finalSize) {
+  const recommendedWidth = Number(String(recommended).split("-")[0]);
+  const finalWidth = Number(String(finalSize).split("-")[0]);
+  if (!Number.isFinite(recommendedWidth) || !Number.isFinite(finalWidth)) return 0;
+  return finalWidth - recommendedWidth;
+}
+
+function expectedWeight(height) {
+  const meters = Math.max(Number(height) / 100, 0.1);
+  return 24 * meters * meters;
+}
+
+function bucket(value, step) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "";
+  return Math.round(numeric / step) * step;
+}
+
+function buildLearningSummary(rows) {
+  const byDate = new Map();
+  (rows || []).forEach((row) => {
+    const date = String(row.timestamp || "").slice(0, 10) || "-";
+    const entry = byDate.get(date) || { date, count: 0, changed: 0, deltaSum: 0 };
+    entry.count += 1;
+    if (row.changed === "Y" || row.changed === true) entry.changed += 1;
+    entry.deltaSum += Number(row.size_delta || row.sizeDelta || 0);
+    byDate.set(date, entry);
+  });
+  const history = [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date), "ko"));
+  let adjustment = 0;
+  return {
+    totalRows: rows.length,
+    changedRows: rows.filter((row) => row.changed === "Y" || row.changed === true).length,
+    baselineA: 24,
+    currentA: 24 + history.reduce((sum, row) => sum + Math.sign(row.deltaSum) * 0.02, 0),
+    history: history.map((row) => {
+      adjustment += Math.sign(row.deltaSum) * 0.02;
+      return {
+        date: row.date,
+        count: row.count,
+        changeRate: row.count ? Number(((row.changed / row.count) * 100).toFixed(1)) : 0,
+        aValue: Number((24 + adjustment).toFixed(2))
+      };
+    })
   };
 }
 
@@ -266,10 +363,10 @@ function writeJson(key, value) {
 
 function buildDemoRecords(config) {
   const people = [
-    { recruitNo: "2401", height: 171, weight: 66 },
-    { recruitNo: "2402", height: 178, weight: 75 },
-    { recruitNo: "2403", height: 184, weight: 83 },
-    { recruitNo: "2404", height: 169, weight: 59 }
+    { cohort: "26-1기", recruitNo: "2401", height: 171, weight: 66 },
+    { cohort: "26-1기", recruitNo: "2402", height: 178, weight: 75 },
+    { cohort: "26-2기", recruitNo: "2401", height: 184, weight: 83 },
+    { cohort: "26-2기", recruitNo: "2402", height: 169, weight: 59 }
   ];
   const today = new Date();
   const rows = [];
@@ -282,7 +379,6 @@ function buildDemoRecords(config) {
       timestamp.setDate(today.getDate() - ((personIndex + roundIndex) % 4));
       timestamp.setHours(9 + roundIndex, 10 + personIndex, 0, 0);
       const submissionId = `demo-${person.recruitNo}-${round.roundId}`;
-      const bmiValue = demoBmi(person.height, person.weight);
       items.forEach((item, itemIndex) => {
         const recommended = demoSize(item, personIndex + roundIndex + itemIndex);
         const changed = (personIndex + roundIndex + itemIndex) % 5 === 0;
@@ -290,10 +386,11 @@ function buildDemoRecords(config) {
         rows.push({
           submission_id: submissionId,
           timestamp: timestamp.toISOString(),
+          cohort: person.cohort,
           recruit_no: person.recruitNo,
-          height_cm: person.height,
-          weight_kg: person.weight,
-          bmi: bmiValue,
+          height_cm: "",
+          weight_kg: "",
+          bmi: "",
           round_id: round.roundId,
           round_name: round.label,
           item_id: item.itemId,
@@ -315,9 +412,4 @@ function demoSize(item, seed) {
   const sizes = item.sizes || [];
   if (!sizes.length) return "-";
   return sizes[Math.abs(seed) % sizes.length];
-}
-
-function demoBmi(height, weight) {
-  const meters = Math.max(Number(height) / 100, 0.1);
-  return Number((Number(weight) / (meters * meters)).toFixed(1));
 }

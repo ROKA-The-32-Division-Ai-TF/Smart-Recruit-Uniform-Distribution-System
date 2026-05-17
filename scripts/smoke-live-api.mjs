@@ -36,9 +36,11 @@ const before = await post(endpoint, "adminSummary", { adminPin });
 assert(before.ok, "adminSummary 최초 조회 실패");
 
 const recruitNo = `99${Date.now().toString().slice(-8)}`;
-console.log(`live smoke recruitNo: ${recruitNo}`);
-const profile = buildProfile({ recruitNo, height: 177, weight: 74 });
+const cohort = `smoke-${new Date().toISOString().slice(5, 10)}`;
+console.log(`live smoke cohort/recruitNo: ${cohort} ${recruitNo}`);
+const profile = buildProfile({ cohort, recruitNo, height: 177, weight: 74 });
 const initialStatus = await post(endpoint, "getStatus", {
+  cohort,
   recruitNo,
   roundIds: config.rounds.map((round) => round.roundId)
 });
@@ -67,6 +69,7 @@ for (const round of config.rounds) {
   assert(duplicateRound.ok && duplicateRound.duplicate === true, `${round.label} 교번/차수 중복 저장 방지 실패`);
 
   const status = await post(endpoint, "getStatus", {
+    cohort,
     recruitNo,
     roundIds: config.rounds.map((candidate) => candidate.roundId)
   });
@@ -80,6 +83,7 @@ for (const round of config.rounds) {
 }
 
 const finalStatus = await post(endpoint, "getStatus", {
+  cohort,
   recruitNo,
   roundIds: config.rounds.map((round) => round.roundId)
 });
@@ -91,11 +95,12 @@ assert(after.ok, "adminSummary 최종 조회 실패");
 const expectedAddedRows = config.rounds.reduce((sum, round) => sum + getRoundItems(config, round).length, 0);
 const addedRows = Number(after.overview?.totalItems || 0) - Number(before.overview?.totalItems || 0);
 assert(addedRows === expectedAddedRows, `추가 raw row 수 불일치: expected ${expectedAddedRows}, actual ${addedRows}`);
-const personRows = (after.personSummary || []).filter((row) => String(row.recruitNo) === recruitNo);
+const personRows = (after.personSummary || []).filter((row) => String(row.cohort) === cohort && String(row.recruitNo) === recruitNo);
 assert(personRows.length === config.rounds.length, "개인별 현황의 차수별 행 수가 맞지 않습니다.");
 
 console.log(JSON.stringify({
   ok: true,
+  cohort,
   recruitNo,
   spreadsheetName: ping.spreadsheetName,
   roundsTested: submitted.map((row) => row.label),

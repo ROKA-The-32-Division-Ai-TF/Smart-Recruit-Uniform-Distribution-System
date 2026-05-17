@@ -29,11 +29,12 @@ export const REC_CONFIG = {
   ]
 };
 
-export function buildProfile({ recruitNo, height, weight }) {
+export function buildProfile({ cohort, recruitNo, height, weight }) {
   const heightNum = Number(height);
   const weightNum = Number(weight);
   const bmiValue = bmi(heightNum, weightNum);
   return {
+    cohort: normalizeCohort(cohort),
     recruitNo: String(recruitNo || "").trim(),
     height: heightNum,
     weight: weightNum,
@@ -47,8 +48,9 @@ export function bmi(height, weight) {
   return Number((Number(weight) / (meters * meters)).toFixed(1));
 }
 
-export function validateProfileInput({ recruitNo, height, weight }) {
+export function validateProfileInput({ cohort, recruitNo, height, weight }) {
   const errors = [];
+  if (!normalizeCohort(cohort)) errors.push("기수를 입력해 주세요. 예: 26-1기");
   if (!String(recruitNo || "").trim()) errors.push("교번을 입력해 주세요.");
   const heightNum = Number(height);
   const weightNum = Number(weight);
@@ -59,6 +61,10 @@ export function validateProfileInput({ recruitNo, height, weight }) {
     errors.push("몸무게는 35kg부터 160kg 사이로 입력해 주세요.");
   }
   return errors;
+}
+
+export function normalizeCohort(value) {
+  return String(value || "").trim().replace(/\s+/g, "");
 }
 
 export function recommendForItem(item, profile, recConfig = REC_CONFIG) {

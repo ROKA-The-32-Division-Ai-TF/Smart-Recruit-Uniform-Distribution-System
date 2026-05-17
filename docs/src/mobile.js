@@ -38,6 +38,12 @@ function renderInput(message = "") {
       <form id="profileForm" class="input-card">
         <div class="input-grid">
           <label class="profile-field">
+            <span>기수</span>
+            <div class="field-input-wrap">
+              <input name="cohort" type="text" inputmode="text" autocomplete="off" placeholder="26-1기" aria-label="기수" value="${esc(state.profile?.cohort || "")}" />
+            </div>
+          </label>
+          <label class="profile-field">
             <span>교번</span>
             <div class="field-input-wrap">
               <input name="recruitNo" type="text" inputmode="numeric" autocomplete="off" placeholder="교번 입력" aria-label="교번" value="${esc(state.profile?.recruitNo || "")}" />
@@ -77,6 +83,7 @@ async function handleProfileSubmit(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const raw = {
+    cohort: form.get("cohort"),
     recruitNo: form.get("recruitNo"),
     height: form.get("height"),
     weight: form.get("weight")
@@ -92,7 +99,7 @@ async function handleProfileSubmit(event) {
   showRecommendationLoading(true);
   try {
     const [status] = await Promise.all([
-      state.api.getStatus(state.profile.recruitNo),
+      state.api.getStatus(state.profile.recruitNo, state.profile.cohort),
       wait(650)
     ]);
     state.status = status;
@@ -170,12 +177,10 @@ function renderRecommendationPanel(round) {
     <section class="recommendation-panel">
       <div class="panel-head">
         <div>
-          <span>${esc(round.label)}</span>
-          <h1>추천 사이즈표</h1>
+          <h1>${esc(round.label)} 추천 사이즈표</h1>
         </div>
-        <p>${renderProfileMeta()}</p>
       </div>
-      <p class="recommendation-hint">품목을 터치하면 사진과 세부 사이즈표를 확인할 수 있습니다.</p>
+      <p class="recommendation-hint">품목을 터치하면 세부 사이즈표와 선택 화면을 확인할 수 있습니다.</p>
       <div class="size-card-grid">
         ${state.issueItems.map(renderSizeCard).join("")}
       </div>
@@ -186,8 +191,8 @@ function renderRecommendationPanel(round) {
 
 function renderProfileMeta() {
   const parts = [
-    `${state.profile.height}cm`,
-    `${state.profile.weight}kg`
+    `${state.profile.cohort}`,
+    `교번 ${state.profile.recruitNo}`
   ];
   return esc(parts.join(" · "));
 }
@@ -203,7 +208,6 @@ function renderSizeCard(item) {
           <h2>${esc(item.label)}</h2>
           <span>${direct ? hasSelection ? "선택완료" : "직접선택" : item.finalSize !== recommendation.recommendedSize ? "교체됨" : "추천"}</span>
         </div>
-        <p>${direct ? hasSelection ? "신청 사이즈" : "상세보기에서 선택" : item.finalSize !== recommendation.recommendedSize ? "최종 선택 사이즈" : "백룡AI 추천 사이즈"}</p>
         <strong class="card-size ${hasSelection ? "" : "needs-choice"}">${esc(hasSelection ? item.finalSize : "선택 필요")}</strong>
       </div>
     </button>
@@ -225,7 +229,8 @@ function bindRoundSwitch() {
         const nextRound = state.config.rounds.find((round) => round.roundId === state.status.nextRoundId);
         state.selectedRoundId = state.status.nextRoundId;
         if (state.profile) refreshIssueItems();
-        renderInput(`기록 기준으로 ${nextRound?.label || "다음 차수"}만 확정할 수 있습니다.`);
+        renderInput();
+        showInfoModal("확인 필요", `${nextRound?.label || "다음 차수"}만 확정할 수 있습니다. 이전 차수 기록을 기준으로 자동 이동했습니다.`);
         return;
       }
       if (state.profile && state.status && !state.status.nextRoundId) {
@@ -289,12 +294,12 @@ function renderItem() {
       </div>
       <h1>${esc(item.label)}</h1>
       ${renderItemVisual(item)}
-      <div class="recommend-copy">${direct ? "직접 선택할 사이즈는" : "백룡AI가 추천하는 사이즈는"}</div>
-      <div class="recommend-size ${item.finalSize ? "" : "empty"}">${esc(item.finalSize || "선택")}</div>
+      <div class="recommend-copy">${direct ? "사이즈를 직접 선택해 주세요." : "백룡AI가 추천하는 사이즈는"}</div>
+      <div class="recommend-size ${item.finalSize ? "" : "empty"}">${esc(item.finalSize || (direct ? "미선택" : "선택"))}</div>
       ${renderDetailSizeStack(item)}
       <p class="algorithm-note">${direct ? "AI 추천 없이 본인 실측 또는 착용 기준으로 선택합니다." : `${esc(recommendation.targetDescription)} · BMI ${recommendation.bmi} (${esc(recommendation.bmiLabel)})`}</p>
       <div class="mobile-actions">
-        <button id="changeSize" class="primary-button" type="button">${direct ? "사이즈 선택" : "사이즈 교체"}</button>
+        ${direct ? "" : `<button id="changeSize" class="primary-button" type="button">사이즈 교체</button>`}
         <div class="action-row">
           <button id="prevItem" class="secondary-button" type="button" ${state.itemIndex === 0 ? "disabled" : ""}>이전</button>
           <button id="nextItem" class="secondary-button strong" type="button">${state.itemIndex === state.issueItems.length - 1 ? "최종 확인" : "다음"}</button>
@@ -304,7 +309,7 @@ function renderItem() {
   `;
 
   document.querySelector("#backToSummary").addEventListener("click", () => renderInput("추천 사이즈표로 돌아왔습니다."));
-  document.querySelector("#changeSize").addEventListener("click", () => openSizeSheet(item, "detail"));
+  document.querySelector("#changeSize")?.addEventListener("click", () => openSizeSheet(item, "detail"));
   document.querySelectorAll("[data-detail-size]").forEach((button) => {
     button.addEventListener("click", () => {
       applyItemSize(item, button.dataset.detailSize);
@@ -385,28 +390,29 @@ function renderReview(message = "") {
       <div class="review-list">
         ${state.issueItems
           .map(
-            (item) => `
-              <div class="review-row">
+            (item, index) => `
+              <button class="review-row" data-review-index="${index}" type="button">
                 <span>${esc(item.label)}</span>
                 <strong>${esc(item.finalSize || "선택 필요")}</strong>
                 ${isDirectSelectionItem(item) ? "<em>선택</em>" : item.finalSize !== item.recommendation.recommendedSize ? "<em>교체</em>" : "<em>추천</em>"}
-              </div>
+              </button>
             `
           )
           .join("")}
       </div>
       <div class="review-actions">
         <button id="submitIssue" class="primary-button" type="button">최종 확정</button>
-        <button id="backToItems" class="ghost-button" type="button">품목 다시 확인</button>
       </div>
       <p id="submitMessage" class="form-message">${esc(message)}</p>
     </section>
   `;
 
   document.querySelector("#submitIssue").addEventListener("click", openSubmitConfirm);
-  document.querySelector("#backToItems").addEventListener("click", () => {
-    state.itemIndex = 0;
-    renderItem();
+  document.querySelectorAll(".review-row").forEach((row) => {
+    row.addEventListener("click", () => {
+      state.itemIndex = Number(row.dataset.reviewIndex || 0);
+      renderItem();
+    });
   });
 }
 
@@ -415,7 +421,8 @@ function openSubmitConfirm() {
   const missing = findMissingSelections();
   if (missing) {
     state.itemIndex = state.issueItems.findIndex((item) => item.itemId === missing.itemId);
-    renderInput(`${missing.label} 사이즈를 먼저 선택해 주세요.`);
+    renderItem();
+    showInfoModal("선택 필요", `${missing.label} 사이즈를 직접 선택해 주세요.`);
     return;
   }
   const sheet = document.createElement("div");
@@ -453,12 +460,13 @@ async function submitIssue() {
   const missing = findMissingSelections();
   if (missing) {
     state.itemIndex = state.issueItems.findIndex((item) => item.itemId === missing.itemId);
-    renderInput(`${missing.label} 사이즈를 먼저 선택해 주세요.`);
+    renderItem();
+    showInfoModal("선택 필요", `${missing.label} 사이즈를 직접 선택해 주세요.`);
     return;
   }
   setBusy(true, "불출 내역을 저장하고 있습니다.");
   try {
-    state.status = await state.api.getStatus(state.profile.recruitNo);
+    state.status = await state.api.getStatus(state.profile.recruitNo, state.profile.cohort);
     const routing = syncRoundWithStatus();
     if (routing.allDone) {
       renderDone("모든 불출 차수가 완료되었습니다.", state.status.records || []);
@@ -505,8 +513,8 @@ function renderDone(title, rows) {
       <h1>${esc(title)}</h1>
       <div id="receiptCard" class="receipt-card">
         <div>
-          <span>교번</span>
-          <strong>${esc(state.profile?.recruitNo || rows[0]?.recruit_no || "-")}</strong>
+          <span>기수 / 교번</span>
+          <strong>${esc(state.profile?.cohort || rows[0]?.cohort || "-")} · ${esc(state.profile?.recruitNo || rows[0]?.recruit_no || "-")}</strong>
         </div>
         ${Object.entries(grouped)
           .map(
@@ -708,6 +716,24 @@ function setBusy(isBusy, message) {
       <p>${esc(message)}</p>
     </section>
   `;
+}
+
+function showInfoModal(title, message) {
+  document.querySelector(".info-sheet")?.remove();
+  const sheet = document.createElement("div");
+  sheet.className = "info-sheet";
+  sheet.innerHTML = `
+    <div class="info-panel" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+      <h2 id="infoTitle">${esc(title)}</h2>
+      <p>${esc(message)}</p>
+      <button class="primary-button" type="button" data-info-close>확인</button>
+    </div>
+  `;
+  document.body.appendChild(sheet);
+  sheet.querySelector("[data-info-close]").addEventListener("click", () => sheet.remove());
+  sheet.addEventListener("click", (event) => {
+    if (event.target === sheet) sheet.remove();
+  });
 }
 
 function renderError(message) {

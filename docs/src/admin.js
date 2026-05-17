@@ -10,6 +10,7 @@ let currentAdminPin = "";
 let visibleSizeSummary = [];
 let sizeColumnFilters = {};
 let currentIssueSizeRows = [];
+let currentIssueSummary = null;
 let activeDesktopView = "dashboard";
 let activeIssuePanel = "size";
 let selectedIssueDate = "all";
@@ -63,9 +64,9 @@ function renderDashboard(summary, notice = "") {
   const mobileItemId = resolveMobileItem(mobileItemOptions);
   const mobileIssueSummary = buildIssueSummary(summary, mobileDate, mobileItemId);
   const mobileMetrics = buildMobileMetrics(summary.records || [], mobileDate, mobileItemId);
-  const dailyBars = buildDailyBars(dailySummary);
   const itemShares = buildItemShares(summary.sizeSummary);
   const issueSummary = buildIssueSummary(summary, selectedIssueDate);
+  currentIssueSummary = issueSummary;
   currentIssueSizeRows = issueSummary.sizeSummary;
   visibleSizeSummary = filterSizeRows(currentIssueSizeRows);
   app.className = "admin-shell dashboard-mode";
@@ -86,12 +87,9 @@ function renderDashboard(summary, notice = "") {
             ${renderNavButton("issues", "불출현황")}
             ${renderNavButton("settings", "품목/사이즈 설정")}
           </nav>
-          <div class="dashboard-actions">
-            ${activeDesktopView === "issues" ? `<button id="downloadCsv" type="button">CSV</button>` : ""}
-            <button id="printSummary" type="button">인쇄</button>
-          </div>
+          <div class="dashboard-spacer"></div>
         </header>
-        ${activeDesktopView === "dashboard" ? renderDesktopOverview(summary, today, dailyBars, itemShares) : ""}
+        ${activeDesktopView === "dashboard" ? renderDesktopOverview(summary, today, itemShares) : ""}
         ${activeDesktopView === "issues" ? renderIssueView(issueSummary, dailySummary) : ""}
         ${activeDesktopView === "settings" ? renderSettingsView(notice) : ""}
       </div>
@@ -100,20 +98,22 @@ function renderDashboard(summary, notice = "") {
 
   bindMobileDashboard(dailySummary, mobileDate, mobileItemId);
   bindDesktopNav();
-  document.querySelector("#downloadCsv")?.addEventListener("click", downloadCsv);
-  document.querySelector("#printSummary")?.addEventListener("click", () => window.print());
   if (activeDesktopView === "issues") {
     bindIssueControls();
     bindExcelFilters();
   }
-  if (activeDesktopView === "settings" && document.querySelector("#addConfigItem")) bindConfigEditor();
+  if (activeDesktopView === "settings" && document.querySelector("#addConfigItem")) {
+    bindPinEditor();
+    bindConfigEditor();
+  }
 }
 
 function renderNavButton(view, label) {
   return `<button class="${activeDesktopView === view ? "active" : ""}" data-desktop-nav="${esc(view)}" type="button">${esc(label)}</button>`;
 }
 
-function renderDesktopOverview(summary, today, dailyBars, itemShares) {
+function renderDesktopOverview(summary, today, itemShares) {
+  const learning = summary.learningSummary || { totalRows: 0, changedRows: 0, currentA: 24, history: [] };
   return `
     <section class="dashboard-hero">
       <div>
@@ -126,21 +126,14 @@ function renderDesktopOverview(summary, today, dailyBars, itemShares) {
     <section class="dashboard-kpi-grid">
       ${renderKpiCard("기준일 불출 품목", today.itemCount, "개", "primary")}
       ${renderKpiCard("기준일 불출 인원", today.peopleCount, "명")}
-      ${renderKpiCard("기준일 교체 건수", today.changedCount, "건", "danger")}
-      ${renderKpiCard("누적 총 불출", summary.overview.totalItems, "개", "success")}
-      <article class="dashboard-panel chart-panel">
+      ${renderKpiCard("학습 데이터", learning.totalRows, "건", "success")}
+      ${renderKpiCard("누적 총 불출", summary.overview.totalItems, "개")}
+      <article class="dashboard-panel learning-panel">
         <div class="panel-title">
-          <h2>일자별 불출 추이</h2>
-          <span>최근 ${dailyBars.length || 0}일</span>
+          <h2>추천 가중치 학습 현황</h2>
+          <span>현재 기준값 ${Number(learning.currentA || 24).toFixed(2)}</span>
         </div>
-        ${renderBarChart(dailyBars)}
-      </article>
-      <article class="dashboard-panel round-panel">
-        <div class="panel-title">
-          <h2>차수별 완료</h2>
-          <span>인원 기준</span>
-        </div>
-        ${renderRoundCards(summary.overview.completedRounds)}
+        ${renderLearningChart(learning)}
       </article>
       <article class="dashboard-panel share-panel">
         <div class="panel-title">
@@ -202,7 +195,37 @@ function renderSettingsView(notice) {
         <p>품목 카드를 열어 이미지, 차수, 사이즈표를 관리합니다.</p>
       </div>
     </section>
+    ${renderPinEditor()}
     ${renderConfigEditor(notice)}
+  `;
+}
+
+function renderPinEditor() {
+  return `
+    <section class="admin-section pin-editor">
+      <div class="section-head">
+        <div>
+          <h2>관리자 PIN 변경</h2>
+          <p>새 PIN은 4자리 이상 숫자로 설정합니다.</p>
+        </div>
+      </div>
+      <div class="pin-editor-form">
+        <label>
+          현재 PIN
+          <input id="currentAdminPin" type="password" inputmode="numeric" autocomplete="current-password" value="${esc(currentAdminPin)}" />
+        </label>
+        <label>
+          새 PIN
+          <input id="nextAdminPin" type="password" inputmode="numeric" autocomplete="new-password" />
+        </label>
+        <label>
+          새 PIN 확인
+          <input id="confirmAdminPin" type="password" inputmode="numeric" autocomplete="new-password" />
+        </label>
+        <button id="changeAdminPin" class="secondary-button strong" type="button">PIN 변경</button>
+      </div>
+      <p id="pinNotice" class="config-notice"></p>
+    </section>
   `;
 }
 
@@ -227,6 +250,43 @@ function bindIssueControls() {
       activeIssuePanel = button.dataset.issuePanel || "size";
       renderDashboard(currentSummary);
     });
+  });
+  document.querySelectorAll("[data-print-report]").forEach((button) => {
+    button.addEventListener("click", () => {
+      printIssueReport(button.dataset.printReport || "size");
+    });
+  });
+}
+
+function bindPinEditor() {
+  document.querySelector("#changeAdminPin")?.addEventListener("click", async () => {
+    const notice = document.querySelector("#pinNotice");
+    const currentPin = document.querySelector("#currentAdminPin")?.value || "";
+    const nextPin = document.querySelector("#nextAdminPin")?.value || "";
+    const confirmPin = document.querySelector("#confirmAdminPin")?.value || "";
+    if (!/^[0-9]{4,12}$/.test(nextPin)) {
+      notice.textContent = "새 PIN은 숫자 4자리 이상으로 입력해 주세요.";
+      return;
+    }
+    if (nextPin !== confirmPin) {
+      notice.textContent = "새 PIN 확인이 일치하지 않습니다.";
+      return;
+    }
+    notice.textContent = "PIN을 변경하는 중입니다.";
+    try {
+      const result = await api.changeAdminPin(currentPin, nextPin);
+      if (result.ok === false) {
+        notice.textContent = result.message || "PIN 변경에 실패했습니다.";
+        return;
+      }
+      currentAdminPin = nextPin;
+      document.querySelector("#currentAdminPin").value = nextPin;
+      document.querySelector("#nextAdminPin").value = "";
+      document.querySelector("#confirmAdminPin").value = "";
+      notice.textContent = result.message || "PIN이 변경되었습니다.";
+    } catch (error) {
+      notice.textContent = error.message || "PIN 변경에 실패했습니다.";
+    }
   });
 }
 
@@ -325,7 +385,7 @@ function buildMobileMetrics(records, date, itemId = "all") {
   const changedCount = rows.filter((row) => row.changed === "Y" || row.changed === true).length;
   return {
     itemTypes: new Set(rows.map((row) => row.item_name).filter(Boolean)).size,
-    peopleCount: new Set(rows.map((row) => row.recruit_no).filter(Boolean)).size,
+    peopleCount: new Set(rows.map((row) => personIdentity(row)).filter(Boolean)).size,
     issueCount: rows.length,
     exchangeRate: rows.length ? Number(((changedCount / rows.length) * 100).toFixed(1)) : 0
   };
@@ -381,8 +441,8 @@ function renderMobilePersonSearch(summary) {
         <h2>개인별 검색</h2>
       </div>
       <label class="mobile-search-field">
-        <span>교번</span>
-        <input id="mobileRecruitSearch" type="search" inputmode="numeric" autocomplete="off" placeholder="교번 입력" value="${esc(mobilePersonQuery)}" />
+        <span>기수 또는 교번</span>
+        <input id="mobileRecruitSearch" type="search" autocomplete="off" placeholder="예: 26-1기 또는 80" value="${esc(mobilePersonQuery)}" />
       </label>
       <div id="mobilePersonResults" class="mobile-person-results">
         ${renderMobilePersonResults(summary, mobilePersonQuery)}
@@ -394,7 +454,9 @@ function renderMobilePersonSearch(summary) {
 function renderMobilePersonResults(summary, query) {
   const keyword = String(query || "").trim();
   if (!keyword) return `<p class="mobile-empty-state">교번을 입력하면 개인별 불출 내역이 표시됩니다.</p>`;
-  const rows = summary.personSummary.filter((row) => String(row.recruitNo).includes(keyword)).slice(0, 8);
+  const rows = summary.personSummary
+    .filter((row) => `${row.cohort || ""} ${row.recruitNo}`.includes(keyword))
+    .slice(0, 8);
   if (!rows.length) return `<p class="mobile-empty-state">조건에 맞는 개인 불출 내역이 없습니다.</p>`;
   return rows.map((row) => {
     const issuedItems = summary.personColumns
@@ -403,7 +465,7 @@ function renderMobilePersonResults(summary, query) {
     return `
       <article class="mobile-person-card">
         <header>
-          <strong>교번 ${esc(row.recruitNo)}</strong>
+          <strong>${esc(row.cohort || "-")} · 교번 ${esc(row.recruitNo)}</strong>
           <span>${esc(row.roundName)}</span>
         </header>
         <div class="mobile-person-counts">
@@ -430,40 +492,43 @@ function renderKpiCard(label, value, unit, tone = "") {
   `;
 }
 
-function renderRoundCards(rounds) {
+function renderLearningChart(learning) {
+  const history = learning.history || [];
+  if (!history.length) {
+    return `
+      <div class="learning-empty">
+        <strong>아직 학습 데이터가 없습니다.</strong>
+        <span>신병이 확정한 추천/교체 결과는 Google Sheets의 ml_training 탭에 자동으로 쌓입니다.</span>
+      </div>
+    `;
+  }
+  const values = history.map((row) => Number(row.aValue || 24));
+  const min = Math.min(...values, 23.8);
+  const max = Math.max(...values, 24.2);
+  const range = Math.max(max - min, 0.1);
+  const points = history.map((row, index) => {
+    const x = history.length === 1 ? 50 : (index / (history.length - 1)) * 100;
+    const y = 38 - ((Number(row.aValue || 24) - min) / range) * 30;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(" ");
   return `
-    <div class="round-mini-list">
-      ${rounds.map((round) => `
-        <div>
-          <span>${esc(round.roundName)}</span>
-          <strong>${round.peopleCount.toLocaleString("ko-KR")}명</strong>
-        </div>
-      `).join("") || `<p>저장된 차수 현황이 없습니다.</p>`}
-    </div>
-  `;
-}
-
-function buildDailyBars(rows) {
-  const recent = rows.slice(0, 8).reverse();
-  const max = Math.max(...recent.map((row) => row.itemCount), 1);
-  return recent.map((row) => ({
-    label: row.date === "-" ? "-" : row.date.slice(5).replace("-", "."),
-    value: row.itemCount,
-    height: Math.max(10, Math.round((row.itemCount / max) * 100))
-  }));
-}
-
-function renderBarChart(rows) {
-  if (!rows.length) return `<div class="empty-chart">저장된 불출 내역이 없습니다.</div>`;
-  return `
-    <div class="bar-chart">
-      ${rows.map((row) => `
-        <div class="bar-item">
-          <span>${row.value.toLocaleString("ko-KR")}</span>
-          <i style="height: ${row.height}%"></i>
-          <em>${esc(row.label)}</em>
-        </div>
-      `).join("")}
+    <div class="learning-chart">
+      <svg viewBox="0 0 100 44" preserveAspectRatio="none" role="img" aria-label="추천 기준값 변화">
+        <polyline points="${points}" />
+        ${history.map((row, index) => {
+          const [x, y] = points.split(" ")[index].split(",");
+          return `<circle cx="${x}" cy="${y}" r="1.5"><title>${esc(row.date)} · 기준값 ${Number(row.aValue || 24).toFixed(2)}</title></circle>`;
+        }).join("")}
+      </svg>
+      <div class="learning-stats">
+        <span>누적 ${Number(learning.totalRows || 0).toLocaleString("ko-KR")}건</span>
+        <span>교체 ${Number(learning.changedRows || 0).toLocaleString("ko-KR")}건</span>
+        <span>현재 a ${Number(learning.currentA || 24).toFixed(2)}</span>
+      </div>
+      <div class="learning-labels">
+        <span>${esc(history[0]?.date || "-")}</span>
+        <span>${esc(history[history.length - 1]?.date || "-")}</span>
+      </div>
     </div>
   `;
 }
@@ -508,8 +573,11 @@ function renderSizeSummaryPanel(summary) {
   return `
     <section class="admin-section desktop-only dashboard-table-panel">
       <div class="section-head">
-        <h2>사이즈별 불출 수량</h2>
-        <p>표 제목의 필터 버튼으로 엑셀처럼 골라 볼 수 있습니다.</p>
+        <div>
+          <h2>사이즈별 불출 수량</h2>
+          <p>표 제목의 필터 버튼으로 엑셀처럼 골라 볼 수 있습니다.</p>
+        </div>
+        <button class="secondary-button print-report-button" data-print-report="size" type="button">필터 결과 인쇄</button>
       </div>
       <div class="table-wrap">
         <table class="admin-table excel-table" id="sizeTable">
@@ -539,25 +607,25 @@ function renderPersonPanel(summary) {
   return `
     <section class="admin-section desktop-only dashboard-table-panel">
       <div class="section-head">
-        <h2>개인별 불출 현황</h2>
-        <p>품목이 추가되어도 설정 파일 기준으로 열이 자동 생성됩니다.</p>
+        <div>
+          <h2>개인별 불출 현황</h2>
+          <p>품목이 추가되어도 설정 파일 기준으로 열이 자동 생성됩니다.</p>
+        </div>
+        <button class="secondary-button print-report-button" data-print-report="person" type="button">현재 목록 인쇄</button>
       </div>
       <div class="table-wrap">
         <table class="admin-table" id="personTable">
           <thead>
             <tr>
+              <th>기수</th>
               <th>교번</th>
               <th>차수</th>
-              <th>키</th>
-              <th>몸무게</th>
-              <th>발</th>
-              <th>머리</th>
               ${summary.personColumns.map((column) => `<th>${esc(column)}</th>`).join("")}
               <th>교체</th>
             </tr>
           </thead>
           <tbody>
-            ${summary.personSummary.map((row) => renderPersonRow(row, summary.personColumns)).join("") || `<tr><td colspan="${summary.personColumns.length + 7}">저장된 불출 내역이 없습니다.</td></tr>`}
+            ${summary.personSummary.map((row) => renderPersonRow(row, summary.personColumns)).join("") || `<tr><td colspan="${summary.personColumns.length + 4}">저장된 불출 내역이 없습니다.</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -624,7 +692,7 @@ function buildDailySummary(records) {
     };
     entry.itemCount += 1;
     if (row.changed === "Y" || row.changed === true) entry.changedCount += 1;
-    entry.people.add(row.recruit_no);
+    entry.people.add(personIdentity(row));
     entry.rounds[row.round_name] = (entry.rounds[row.round_name] || 0) + 1;
     byDate.set(date, entry);
   });
@@ -662,13 +730,10 @@ function buildSummaryFromRecords(summary, records) {
     if (row.changed === "Y" || row.changed === true) sizeEntry.changedCount += 1;
     bySize.set(sizeKey, sizeEntry);
 
-    const personKey = [row.recruit_no, row.round_id].join("|");
+    const personKey = [row.cohort || "", row.recruit_no, row.round_id].join("|");
     const person = byPerson.get(personKey) || {
+      cohort: String(row.cohort || ""),
       recruitNo: String(row.recruit_no || ""),
-      height: row.height_cm,
-      weight: row.weight_kg,
-      footSize: row.foot_size,
-      headSize: row.head_size,
       roundId: String(row.round_id || ""),
       roundName: String(row.round_name || ""),
       changedCount: 0,
@@ -682,9 +747,19 @@ function buildSummaryFromRecords(summary, records) {
   return {
     ...summary,
     sizeSummary: [...bySize.values()].sort(summarySorter),
-    personSummary: [...byPerson.values()].sort((a, b) => String(a.recruitNo).localeCompare(String(b.recruitNo), "ko") || String(a.roundId).localeCompare(String(b.roundId), "ko")),
+    personSummary: [...byPerson.values()].sort((a, b) =>
+      String(a.cohort || "").localeCompare(String(b.cohort || ""), "ko") ||
+      String(a.recruitNo).localeCompare(String(b.recruitNo), "ko") ||
+      String(a.roundId).localeCompare(String(b.roundId), "ko")
+    ),
     records
   };
+}
+
+function personIdentity(row) {
+  const recruitNo = String(row.recruit_no || "").trim();
+  if (!recruitNo) return "";
+  return `${String(row.cohort || "").trim()}|${recruitNo}`;
 }
 
 function summarySorter(a, b) {
@@ -830,38 +905,66 @@ function renderSizeRow(row) {
 function renderPersonRow(row, columns) {
   return `
     <tr>
+      <td>${esc(row.cohort || "-")}</td>
       <td><strong>${esc(row.recruitNo)}</strong></td>
       <td>${esc(row.roundName)}</td>
-      <td>${esc(row.height)}</td>
-      <td>${esc(row.weight)}</td>
-      <td>${esc(row.footSize || "-")}</td>
-      <td>${esc(row.headSize || "-")}</td>
       ${columns.map((column) => `<td>${esc(row.items[column] || "-")}</td>`).join("")}
       <td>${row.changedCount ? "있음" : "없음"}</td>
     </tr>
   `;
 }
 
-function downloadCsv() {
-  if (!currentSummary) return;
-  const sourceRows = visibleSizeSummary || currentSummary.sizeSummary;
-  const rows = [
-    ["차수", "품목", "사이즈", "수량", "교체"],
-    ...sourceRows.map((row) => [row.roundName, row.itemName, row.size, row.count, row.changedCount])
-  ];
-  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
-  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `summary-by-size-${new Date().toISOString().slice(0, 10)}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function csvCell(value) {
-  const text = String(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
+function printIssueReport(type) {
+  const title = type === "person" ? "개인별 불출 현황" : "사이즈별 불출 수량";
+  const rows = type === "person" ? currentIssueSummary?.personSummary || [] : visibleSizeSummary || [];
+  const columns = type === "person"
+    ? ["기수", "교번", "차수", ...(currentIssueSummary?.personColumns || []), "교체"]
+    : ["차수", "품목", "사이즈", "수량", "교체"];
+  const bodyRows = type === "person"
+    ? rows.map((row) => [
+        row.cohort || "-",
+        row.recruitNo,
+        row.roundName,
+        ...(currentIssueSummary?.personColumns || []).map((column) => row.items[column] || "-"),
+        row.changedCount ? "있음" : "없음"
+      ])
+    : rows.map((row) => [row.roundName, row.itemName, row.size, row.count, row.changedCount]);
+  const dateText = selectedIssueDate === "all" ? "전체 기간" : selectedIssueDate;
+  const html = `
+    <!doctype html>
+    <html lang="ko">
+      <head>
+        <meta charset="UTF-8" />
+        <title>${esc(title)}</title>
+        <style>
+          @page { size: A4 landscape; margin: 12mm; }
+          body { margin: 0; color: #111827; font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+          h1 { margin: 0 0 4px; color: #17377d; font-size: 22px; }
+          p { margin: 0 0 14px; color: #5f6b80; font-weight: 700; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: auto; }
+          th, td { border: 1px solid #cbd5e1; padding: 7px 8px; text-align: left; white-space: nowrap; }
+          th { color: #17377d; background: #eef4ff; font-weight: 900; }
+          td { font-weight: 700; }
+        </style>
+      </head>
+      <body>
+        <h1>${esc(title)}</h1>
+        <p>${esc(dateText)} · ${bodyRows.length.toLocaleString("ko-KR")}건</p>
+        <table>
+          <thead><tr>${columns.map((column) => `<th>${esc(column)}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${bodyRows.map((row) => `<tr>${row.map((cell) => `<td>${esc(cell)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${columns.length}">인쇄할 내역이 없습니다.</td></tr>`}
+          </tbody>
+        </table>
+        <script>window.addEventListener("load", () => { window.print(); });</script>
+      </body>
+    </html>
+  `;
+  const popup = window.open("", "_blank");
+  if (!popup) return;
+  popup.document.open();
+  popup.document.write(html);
+  popup.document.close();
 }
 
 function uniqueValues(values) {
@@ -917,7 +1020,11 @@ function renderConfigRound(round, index) {
         <span>차수명</span>
         <input data-round-field="label" value="${esc(round.label || `${index + 1}차 불출`)}" />
       </label>
-      <button class="ghost-button remove-config-round" type="button">삭제</button>
+      <div class="config-order-actions">
+        <button data-move-round="up" type="button">위</button>
+        <button data-move-round="down" type="button">아래</button>
+        <button class="remove-config-round" type="button">삭제</button>
+      </div>
     </article>
   `;
 }
@@ -931,14 +1038,20 @@ function renderConfigItem(item, roundMap, rounds = config.rounds) {
       <input data-field="order" type="hidden" value="${esc(item.order || 0)}" />
       <input data-field="image" type="hidden" value="${esc(item.image || "")}" />
       <input data-field="imagePosition" type="hidden" value="${esc(item.imagePosition || "center")}" />
-      <input data-field="imageSize" type="hidden" value="${esc(item.imageSize || "cover")}" />
-      <button class="config-item-toggle" data-config-toggle type="button" aria-expanded="${expanded ? "true" : "false"}">
-        <span>
-          <strong data-config-title>${esc(item.label)}</strong>
-          <small>${(item.sizes || []).length.toLocaleString("ko-KR")}개 사이즈 · 클릭해서 수정</small>
-        </span>
-        <b>${expanded ? "접기" : "열기"}</b>
-      </button>
+      <input data-field="imageSize" type="hidden" value="${esc(item.imageSize || "contain")}" />
+      <div class="config-item-toolbar">
+        <button class="config-item-toggle" data-config-toggle type="button" aria-expanded="${expanded ? "true" : "false"}">
+          <span>
+            <strong data-config-title>${esc(item.label)}</strong>
+            <small>${(item.sizes || []).length.toLocaleString("ko-KR")}개 사이즈 · 클릭해서 수정</small>
+          </span>
+          <b>${expanded ? "접기" : "열기"}</b>
+        </button>
+        <div class="config-order-actions item-order-actions">
+          <button data-move-item="up" type="button">위</button>
+          <button data-move-item="down" type="button">아래</button>
+        </div>
+      </div>
       <div class="config-item-body" ${expanded ? "" : "hidden"}>
         <div class="config-card-head">
           <label>
@@ -997,7 +1110,7 @@ function bindConfigEditor() {
       label: "새 품목",
       recommendationType: "manual",
       image: "",
-      order: config.items.length ? Math.min(...config.items.map((entry) => Number(entry.order || 0))) - 10 : 10,
+      order: 0,
       sizes: []
     };
     const roundMap = Object.fromEntries(rounds.map((round, index) => [round.roundId, new Set(index === 0 ? [itemId] : [])]));
@@ -1005,6 +1118,7 @@ function bindConfigEditor() {
     container.insertAdjacentHTML("afterbegin", renderConfigItem(item, roundMap, rounds));
     const node = container.firstElementChild;
     bindConfigItem(node);
+    refreshConfigOrders();
     node.scrollIntoView({ block: "start" });
     node.querySelector('[data-field="label"]')?.focus();
   });
@@ -1025,6 +1139,7 @@ function addConfigRound() {
   const container = document.querySelector("#configRounds");
   container.insertAdjacentHTML("beforeend", renderConfigRound(round, rounds.length));
   bindConfigRound(container.lastElementChild);
+  refreshConfigOrders();
   document.querySelectorAll("[data-config-item] .round-checks").forEach((fieldset) => {
     fieldset.insertAdjacentHTML("beforeend", renderRoundCheck(round, false));
   });
@@ -1041,6 +1156,12 @@ function bindConfigRound(node) {
       target.textContent = label;
     });
   });
+  node.querySelectorAll("[data-move-round]").forEach((button) => {
+    button.onclick = () => {
+      moveConfigNode(node, button.dataset.moveRound, "[data-config-round]");
+      refreshConfigOrders();
+    };
+  });
   node.querySelector(".remove-config-round").onclick = () => {
     const roundNodes = document.querySelectorAll("[data-config-round]");
     if (roundNodes.length <= 1) {
@@ -1050,6 +1171,7 @@ function bindConfigRound(node) {
     const label = labelInput.value.trim() || "차수";
     node.remove();
     document.querySelectorAll(`[data-round-wrap="${idInput.value}"]`).forEach((target) => target.remove());
+    refreshConfigOrders();
     setConfigNotice(`${label}을 삭제했습니다. 설정 저장을 누르면 반영됩니다.`);
   };
 }
@@ -1093,9 +1215,51 @@ function bindConfigItem(node) {
   labelInput?.addEventListener("input", () => {
     node.querySelector("[data-config-title]").textContent = labelInput.value.trim() || "새 품목";
   });
-  node.querySelector(".remove-config-item").onclick = () => node.remove();
+  node.querySelectorAll("[data-move-item]").forEach((button) => {
+    button.onclick = () => {
+      moveConfigNode(node, button.dataset.moveItem, "[data-config-item]");
+      refreshConfigOrders();
+    };
+  });
+  node.querySelector(".remove-config-item").onclick = () => {
+    node.remove();
+    refreshConfigOrders();
+  };
   bindImageUploader(node);
   bindSizeEditor(node);
+}
+
+function moveConfigNode(node, direction, selector) {
+  if (direction === "up") {
+    const previous = previousMatchingSibling(node, selector);
+    if (previous) node.parentNode.insertBefore(node, previous);
+  } else {
+    const next = nextMatchingSibling(node, selector);
+    if (next) node.parentNode.insertBefore(next, node);
+  }
+}
+
+function previousMatchingSibling(node, selector) {
+  let current = node.previousElementSibling;
+  while (current && !current.matches(selector)) current = current.previousElementSibling;
+  return current;
+}
+
+function nextMatchingSibling(node, selector) {
+  let current = node.nextElementSibling;
+  while (current && !current.matches(selector)) current = current.nextElementSibling;
+  return current;
+}
+
+function refreshConfigOrders() {
+  document.querySelectorAll("[data-config-round]").forEach((node, index) => {
+    const order = node.querySelector('[data-round-field="order"]');
+    if (order) order.value = String(index + 1);
+  });
+  document.querySelectorAll("[data-config-item]").forEach((node, index) => {
+    const order = node.querySelector('[data-field="order"]');
+    if (order) order.value = String(index + 1);
+  });
 }
 
 function readRoundEditorEntries() {
@@ -1132,11 +1296,15 @@ function nextRoundId(rounds, number) {
 function bindImageUploader(node) {
   const fileInput = node.querySelector("[data-image-file]");
   const imageInput = node.querySelector('[data-field="image"]');
+  const imagePositionInput = node.querySelector('[data-field="imagePosition"]');
+  const imageSizeInput = node.querySelector('[data-field="imageSize"]');
   fileInput.onchange = async () => {
     const file = fileInput.files?.[0];
     if (!file) return;
     try {
       imageInput.value = await readImageFile(file);
+      if (imagePositionInput) imagePositionInput.value = "center";
+      if (imageSizeInput) imageSizeInput.value = "contain";
       renderImagePreview(node, imageInput.value);
       setConfigNotice("이미지를 첨부했습니다. 설정 저장을 누르면 반영됩니다.");
     } catch (error) {
@@ -1146,6 +1314,8 @@ function bindImageUploader(node) {
   node.querySelector("[data-clear-image]").onclick = () => {
     fileInput.value = "";
     imageInput.value = "";
+    if (imagePositionInput) imagePositionInput.value = "center";
+    if (imageSizeInput) imageSizeInput.value = "contain";
     renderImagePreview(node, "");
   };
 }
@@ -1206,10 +1376,8 @@ function resizeImageIfNeeded(dataUrl, mimeType) {
       canvas.width = Math.max(1, Math.round(image.width * scale));
       canvas.height = Math.max(1, Math.round(image.height * scale));
       const context = canvas.getContext("2d");
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", 0.86));
+      resolve(canvas.toDataURL(mimeType === "image/jpeg" ? "image/jpeg" : "image/webp", 0.86));
     };
     image.onerror = () => resolve(dataUrl);
     image.src = dataUrl;
@@ -1273,8 +1441,8 @@ function collectConfigFromEditor() {
       recommendationType: get("recommendationType") || "manual",
       image: get("image"),
       imagePosition: get("imagePosition") || "center",
-      imageSize: get("imageSize") || "cover",
-      order: Number(get("order") || index * 10),
+      imageSize: get("imageSize") || "contain",
+      order: index + 1,
       sizes
     };
   });

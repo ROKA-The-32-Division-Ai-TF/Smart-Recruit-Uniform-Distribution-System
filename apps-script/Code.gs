@@ -3,8 +3,9 @@ const SIZE_SHEET = "summary_by_size";
 const PERSON_SHEET = "summary_by_person";
 const EXCHANGE_SHEET = "exchange_summary";
 const CONFIG_SHEET = "runtime_config";
+const ML_SHEET = "ml_training";
 const CONFIG_CHUNK_SIZE = 45000;
-const SCRIPT_CODE_VERSION = "2026-05-17-security-v1";
+const SCRIPT_CODE_VERSION = "2026-05-17-cohort-privacy-ml-v1";
 
 const RAW_HEADERS = [
   "submission_id",
@@ -23,7 +24,25 @@ const RAW_HEADERS = [
   "change_reason",
   "config_version",
   "foot_size",
-  "head_size"
+  "head_size",
+  "cohort"
+];
+
+const ML_HEADERS = [
+  "timestamp",
+  "cohort",
+  "round_id",
+  "round_name",
+  "item_id",
+  "item_name",
+  "recommendation_type",
+  "recommended_size",
+  "final_size",
+  "changed",
+  "size_delta",
+  "bmi_bucket",
+  "dis_bucket",
+  "config_version"
 ];
 
 function doPost(e) {
@@ -51,6 +70,9 @@ function doPost(e) {
     }
     if (action === "saveConfig") {
       return json_(saveConfig_(payload));
+    }
+    if (action === "changeAdminPin") {
+      return json_(changeAdminPin_(payload));
     }
 
     return json_({ ok: false, message: "알 수 없는 action입니다." });
@@ -109,11 +131,13 @@ function initialize_(payload) {
 
 function getStatus_(payload) {
   ensureSheets_();
+  const cohort = String(payload.cohort || "").trim();
   const recruitNo = String(payload.recruitNo || "").trim();
+  if (!cohort) return { ok: false, message: "기수가 없습니다." };
   if (!recruitNo) return { ok: false, message: "교번이 없습니다." };
 
   const rows = readRawRecords_().filter(function(row) {
-    return String(row.recruit_no) === recruitNo;
+    return String(row.recruit_no) === recruitNo && String(row.cohort || "") === cohort;
   });
   const completedRoundIds = unique_(rows.map(function(row) {
     return String(row.round_id || "");
@@ -125,6 +149,7 @@ function getStatus_(payload) {
 
   return {
     ok: true,
+    cohort: cohort,
     recruitNo: recruitNo,
     completedRoundIds: completedRoundIds,
     nextRoundId: nextRoundId,
@@ -150,6 +175,7 @@ function submitIssue_(payload) {
 
     const existingRoundRows = existingRows.filter(function(row) {
       return String(row.recruit_no) === String(payload.recruitNo) &&
+        String(row.cohort || "") === String(payload.cohort || "") &&
         String(row.round_id) === String(payload.roundId);
     });
     if (existingRoundRows.length) {
@@ -162,9 +188,9 @@ function submitIssue_(payload) {
         payload.submissionId,
         timestamp,
         String(payload.recruitNo),
-        Number(payload.height),
-        Number(payload.weight),
-        Number(payload.bmi || calcBmi_(payload.height, payload.weight)),
+        "",
+        "",
+        "",
         payload.roundId,
         payload.roundName,
         item.itemId,
@@ -175,11 +201,13 @@ function submitIssue_(payload) {
         item.changeReason || "",
         payload.configVersion || "",
         Number(payload.footSize) || "",
-        Number(payload.headSize) || ""
+        Number(payload.headSize) || "",
+        String(payload.cohort || "")
       ];
     });
 
     rawSheet.getRange(rawSheet.getLastRow() + 1, 1, values.length, RAW_HEADERS.length).setValues(values);
+    appendLearningRows_(payload, timestamp);
     refreshSummaries_();
 
     const records = values.map(function(row) {
@@ -215,6 +243,16 @@ function saveConfig_(payload) {
   }
 }
 
+function changeAdminPin_(payload) {
+  assertAdmin_(payload.adminPin);
+  const nextPin = String(payload.nextPin || "").trim();
+  if (!/^[0-9]{4,12}$/.test(nextPin)) {
+    throw new Error("새 PIN은 숫자 4~12자리로 설정해 주세요.");
+  }
+  PropertiesService.getScriptProperties().setProperty("ADMIN_PIN", nextPin);
+  return { ok: true, message: "관리자 PIN을 변경했습니다." };
+}
+
 function assertAdmin_(adminPin) {
   const savedPin = PropertiesService.getScriptProperties().getProperty("ADMIN_PIN");
   if (!savedPin) {
@@ -241,7 +279,7 @@ function normalizeConfigForStorage_(config) {
       label: String(item.label || itemId).trim(),
       image: String(item.image || "").trim(),
       imagePosition: String(item.imagePosition || "center").trim(),
-      imageSize: String(item.imageSize || "cover").trim(),
+      imageSize: String(item.imageSize || "contain").trim(),
       sizes: Array.isArray(item.sizes) ? item.sizes.map(function(size) { return String(size).trim(); }).filter(Boolean) : [],
       recommendationType: String(item.recommendationType || "manual").trim(),
       order: Number(item.order || index * 10)
@@ -270,6 +308,7 @@ function normalizeConfigForStorage_(config) {
 
 function validateSubmission_(payload) {
   if (!String(payload.submissionId || "").trim()) throw new Error("submissionId가 없습니다.");
+  if (!String(payload.cohort || "").trim()) throw new Error("기수가 없습니다.");
   if (!String(payload.recruitNo || "").trim()) throw new Error("교번이 없습니다.");
   if (!String(payload.roundId || "").trim()) throw new Error("불출 차수가 없습니다.");
   if (!Array.isArray(payload.items) || payload.items.length === 0) throw new Error("불출 품목이 없습니다.");
@@ -283,15 +322,19 @@ function refreshSummaries_() {
     return [row.roundId, row.roundName, row.itemId, row.itemName, row.size, row.count, row.changedCount];
   }));
 
-  const personHeaders = ["recruit_no", "round_id", "round_name", "height_cm", "weight_kg", "foot_size", "head_size"].concat(summary.personColumns).concat(["changed_count"]);
+  const personHeaders = ["cohort", "recruit_no", "round_id", "round_name"].concat(summary.personColumns).concat(["changed_count"]);
   writeSheet_(PERSON_SHEET, personHeaders, summary.personSummary.map(function(row) {
-    return [row.recruitNo, row.roundId, row.roundName, row.height, row.weight, row.footSize, row.headSize]
+    return [row.cohort, row.recruitNo, row.roundId, row.roundName]
       .concat(summary.personColumns.map(function(column) { return row.items[column] || ""; }))
       .concat([row.changedCount]);
   }));
 
   writeSheet_(EXCHANGE_SHEET, ["round_id", "round_name", "item_id", "item_name", "total_count", "changed_count", "change_rate"], summary.exchangeSummary.map(function(row) {
     return [row.roundId, row.roundName, row.itemId, row.itemName, row.totalCount, row.changedCount, row.changeRate];
+  }));
+
+  writeSheet_("ml_summary", ["date", "event_count", "changed_count", "change_rate", "estimated_a"], summary.learningSummary.history.map(function(row) {
+    return [row.date, row.count, row.changed, row.changeRate, row.aValue];
   }));
 }
 
@@ -321,13 +364,10 @@ function buildSummary_(records) {
     bySize[sizeKey].count += 1;
     if (changed) bySize[sizeKey].changedCount += 1;
 
-    const personKey = [row.recruit_no, row.round_id].join("|");
+    const personKey = [row.cohort || "", row.recruit_no, row.round_id].join("|");
     byPerson[personKey] = byPerson[personKey] || {
+      cohort: row.cohort || "",
       recruitNo: row.recruit_no,
-      height: row.height_cm,
-      weight: row.weight_kg,
-      footSize: row.foot_size,
-      headSize: row.head_size,
       roundId: row.round_id,
       roundName: row.round_name,
       changedCount: 0,
@@ -350,7 +390,7 @@ function buildSummary_(records) {
     if (changed) byExchange[exchangeKey].changedCount += 1;
 
     completedPeopleByRound[row.round_id] = completedPeopleByRound[row.round_id] || {};
-    completedPeopleByRound[row.round_id][row.recruit_no] = true;
+    completedPeopleByRound[row.round_id][String(row.cohort || "") + "|" + row.recruit_no] = true;
   });
 
   const exchangeSummary = Object.keys(byExchange).map(function(key) {
@@ -375,7 +415,7 @@ function buildSummary_(records) {
   return {
     overview: {
       totalItems: records.length,
-      totalPeople: unique_(records.map(function(row) { return row.recruit_no; })).length,
+      totalPeople: unique_(records.map(function(row) { return String(row.cohort || "") + "|" + row.recruit_no; })).length,
       changedItems: changedItems,
       exchangeRate: records.length ? Math.round((changedItems / records.length) * 1000) / 10 : 0,
       completedRounds: completedRounds
@@ -383,9 +423,12 @@ function buildSummary_(records) {
     sizeSummary: Object.keys(bySize).map(function(key) { return bySize[key]; }).sort(summarySorter_),
     personColumns: itemColumns,
     personSummary: Object.keys(byPerson).map(function(key) { return byPerson[key]; }).sort(function(a, b) {
-      return String(a.recruitNo).localeCompare(String(b.recruitNo), "ko") || String(a.roundId).localeCompare(String(b.roundId), "ko");
+      return String(a.cohort || "").localeCompare(String(b.cohort || ""), "ko") ||
+        String(a.recruitNo).localeCompare(String(b.recruitNo), "ko") ||
+        String(a.roundId).localeCompare(String(b.roundId), "ko");
     }),
     exchangeSummary: exchangeSummary,
+    learningSummary: buildLearningSummary_(readLearningRecords_()),
     records: records
   };
 }
@@ -394,9 +437,11 @@ function ensureSheets_() {
   const rawSheet = getOrCreateSheet_(RAW_SHEET);
   ensureHeader_(rawSheet, RAW_HEADERS);
   ensureHeader_(getOrCreateSheet_(SIZE_SHEET), ["round_id", "round_name", "item_id", "item_name", "final_size", "count", "changed_count"]);
-  ensureHeader_(getOrCreateSheet_(PERSON_SHEET), ["recruit_no", "round_id", "round_name", "height_cm", "weight_kg", "foot_size", "head_size", "changed_count"]);
+  ensureHeader_(getOrCreateSheet_(PERSON_SHEET), ["cohort", "recruit_no", "round_id", "round_name", "changed_count"]);
   ensureHeader_(getOrCreateSheet_(EXCHANGE_SHEET), ["round_id", "round_name", "item_id", "item_name", "total_count", "changed_count", "change_rate"]);
   ensureHeader_(getOrCreateSheet_(CONFIG_SHEET), ["chunk_index", "json_chunk", "updated_at"]);
+  ensureHeader_(getOrCreateSheet_(ML_SHEET), ML_HEADERS);
+  ensureHeader_(getOrCreateSheet_("ml_summary"), ["date", "event_count", "changed_count", "change_rate", "estimated_a"]);
 }
 
 function readRuntimeConfig_() {
@@ -439,6 +484,71 @@ function readRawRecords_() {
   return values
     .filter(function(row) { return row.some(function(cell) { return cell !== ""; }); })
     .map(function(row) { return rowToObject_(RAW_HEADERS, row); });
+}
+
+function appendLearningRows_(payload, timestamp) {
+  const learningItems = payload.learningItems || [];
+  if (!learningItems.length) return;
+  const sheet = getOrCreateSheet_(ML_SHEET);
+  const rows = learningItems.map(function(item) {
+    return [
+      timestamp,
+      String(payload.cohort || ""),
+      payload.roundId,
+      payload.roundName,
+      item.itemId,
+      item.itemName,
+      item.recommendationType || "",
+      item.recommendedSize || "",
+      item.finalSize || "",
+      item.changed ? "Y" : "N",
+      Number(item.sizeDelta || 0),
+      item.bmiBucket || "",
+      item.disBucket || "",
+      item.configVersion || payload.configVersion || ""
+    ];
+  });
+  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, ML_HEADERS.length).setValues(rows);
+}
+
+function readLearningRecords_() {
+  const sheet = getOrCreateSheet_(ML_SHEET);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const values = sheet.getRange(2, 1, lastRow - 1, ML_HEADERS.length).getValues();
+  return values
+    .filter(function(row) { return row.some(function(cell) { return cell !== ""; }); })
+    .map(function(row) { return rowToObject_(ML_HEADERS, row); });
+}
+
+function buildLearningSummary_(rows) {
+  const byDate = {};
+  rows.forEach(function(row) {
+    const date = String(row.timestamp || "").slice(0, 10) || "-";
+    byDate[date] = byDate[date] || { date: date, count: 0, changed: 0, deltaSum: 0 };
+    byDate[date].count += 1;
+    if (row.changed === "Y" || row.changed === true) byDate[date].changed += 1;
+    byDate[date].deltaSum += Number(row.size_delta || 0);
+  });
+  var adjustment = 0;
+  const history = Object.keys(byDate).sort().map(function(date) {
+    const row = byDate[date];
+    adjustment += Math.sign(row.deltaSum) * 0.02;
+    return {
+      date: row.date,
+      count: row.count,
+      changed: row.changed,
+      changeRate: row.count ? Math.round((row.changed / row.count) * 1000) / 10 : 0,
+      aValue: Math.round((24 + adjustment) * 100) / 100
+    };
+  });
+  return {
+    totalRows: rows.length,
+    changedRows: rows.filter(function(row) { return row.changed === "Y" || row.changed === true; }).length,
+    baselineA: 24,
+    currentA: history.length ? history[history.length - 1].aValue : 24,
+    history: history
+  };
 }
 
 function writeSheet_(name, headers, rows) {

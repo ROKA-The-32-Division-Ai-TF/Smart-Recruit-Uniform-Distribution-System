@@ -114,7 +114,7 @@ button:disabled {
   min-height: 100svh;
   min-height: 100dvh;
   display: grid;
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-rows: auto auto auto auto;
   gap: 18px;
   align-content: start;
   padding: max(32px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom));
@@ -201,10 +201,10 @@ button:disabled {
 
 .input-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
-  min-height: 158px;
-  padding: 22px 16px 16px;
+  min-height: 132px;
+  padding: 18px 14px 14px;
   background: var(--panel);
   border-radius: 28px;
   box-shadow: 0 18px 42px rgba(17, 24, 39, 0.08);
@@ -227,13 +227,13 @@ button:disabled {
 }
 
 .input-grid span {
-  font-size: 1.18rem;
+  font-size: 1.04rem;
 }
 
 .field-input-wrap {
   display: flex;
   align-items: center;
-  min-height: 58px;
+  min-height: 50px;
   border-bottom: 3px solid #d7deea;
   padding: 0 4px;
   transition: border-color 180ms ease, transform 180ms ease;
@@ -255,13 +255,13 @@ button:disabled {
 .input-grid select {
   width: 100%;
   min-width: 0;
-  min-height: 50px;
+  min-height: 44px;
   padding: 4px 2px;
   border: 0;
   color: var(--accent);
   background: transparent;
   text-align: center;
-  font-size: 1.25rem;
+  font-size: 1.08rem;
   font-weight: 950;
   outline: 0;
 }
@@ -495,12 +495,9 @@ button:disabled {
 .card-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "title size"
-    "copy size";
+  grid-template-areas: "title size";
   align-items: center;
   column-gap: 12px;
-  row-gap: 4px;
 }
 
 .card-title-row {
@@ -626,23 +623,59 @@ button:disabled {
   place-items: center;
   gap: 10px;
   width: min(340px, 88vw);
-  padding: 26px 22px;
-  border-radius: 26px;
-  color: var(--accent);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.24);
+  padding: 12px;
+  color: #ffffff;
+  background: transparent;
+  box-shadow: none;
   text-align: center;
 }
 
 .recommend-loading-card strong {
-  color: var(--accent-deep);
+  color: #ffffff;
   font-size: 1.45rem;
   font-weight: 950;
 }
 
 .recommend-loading-card span {
+  color: rgba(255, 255, 255, 0.82);
+  font-weight: 900;
+}
+
+.info-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.info-panel {
+  width: min(380px, 100%);
+  padding: 22px;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.22);
+  text-align: center;
+}
+
+.info-panel h2 {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 1.55rem;
+}
+
+.info-panel p {
+  margin: 0 0 18px;
   color: var(--muted);
   font-weight: 900;
+}
+
+.info-panel .primary-button {
+  min-height: 54px;
+  border-radius: 18px;
+  font-size: 1.12rem;
 }
 
 .confirm-sheet {
@@ -996,6 +1029,10 @@ button:disabled {
 }
 
 .review-row {
+  width: 100%;
+  border: 1px solid #e4ebff;
+  color: inherit;
+  text-align: left;
   display: grid;
   grid-template-columns: 1fr auto auto;
   gap: 12px;
@@ -1742,6 +1779,28 @@ button:disabled {
   background: #fff7f7;
 }
 
+.config-order-actions {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 6px;
+  align-items: end;
+}
+
+.config-order-actions button {
+  min-height: 38px;
+  border: 1px solid #d8e5fb;
+  border-radius: 10px;
+  padding: 0 10px;
+  color: var(--blue);
+  background: #ffffff;
+  font-weight: 950;
+}
+
+.config-order-actions .remove-config-round {
+  color: #b91c1c;
+  background: #fff7f7;
+}
+
 .config-item {
   display: grid;
   gap: 14px;
@@ -1749,6 +1808,19 @@ button:disabled {
   border: 1px solid #dce6fb;
   border-radius: 16px;
   background: #f8fbff;
+}
+
+.config-item-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.item-order-actions {
+  grid-template-columns: repeat(2, auto);
+  align-content: center;
+  padding-right: 12px;
 }
 
 .config-card-head {
@@ -1937,6 +2009,7 @@ button:disabled {
 .section-head {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 14px;
   padding: 18px;
   border-bottom: 1px solid #e4ebff;
@@ -1951,6 +2024,49 @@ button:disabled {
   margin: 0;
   color: var(--muted);
   font-weight: 800;
+}
+
+.print-report-button {
+  width: auto;
+  min-height: 44px;
+  align-self: center;
+  padding: 0 16px;
+  border-radius: 13px;
+  white-space: nowrap;
+}
+
+.pin-editor-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 18px;
+}
+
+.pin-editor-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--blue-dark);
+  font-weight: 950;
+}
+
+.pin-editor-form input {
+  width: 100%;
+  min-height: 48px;
+  border: 2px solid #d8e5fb;
+  border-radius: 13px;
+  padding: 0 12px;
+  color: var(--blue-dark);
+  background: #ffffff;
+  font: inherit;
+  font-weight: 900;
+}
+
+.pin-editor-form .secondary-button {
+  width: auto;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 13px;
 }
 
 .table-wrap {
@@ -2023,7 +2139,7 @@ button:disabled {
 
 .dashboard-header {
   display: grid;
-  grid-template-columns: minmax(190px, auto) minmax(360px, 1fr) auto;
+  grid-template-columns: minmax(190px, auto) minmax(360px, 1fr) 24px;
   gap: 14px;
   align-items: center;
   margin-bottom: 14px;
@@ -2104,27 +2220,8 @@ button:disabled {
   box-shadow: 0 10px 22px rgba(41, 79, 174, 0.18);
 }
 
-.dashboard-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: end;
-}
-
-.dashboard-actions button {
-  min-height: 44px;
-  border: 0;
-  border-radius: 13px;
-  padding: 0 18px;
-  color: var(--blue-dark);
-  background: #ffffff;
-  border: 1px solid #d8e5fb;
-  font-weight: 950;
-}
-
-.dashboard-actions #downloadCsv {
-  color: #ffffff;
-  background: var(--blue);
-  border-color: var(--blue);
+.dashboard-spacer {
+  width: 24px;
 }
 
 .dashboard-hero {
@@ -2219,13 +2316,13 @@ button:disabled {
   color: var(--blue);
 }
 
-.chart-panel {
-  grid-column: span 2;
+.learning-panel {
+  grid-column: span 3;
   min-height: min(32vh, 290px);
 }
 
-.round-panel,
 .share-panel {
+  grid-column: span 1;
   min-height: min(32vh, 290px);
 }
 
@@ -2253,52 +2350,6 @@ button:disabled {
   font-weight: 900;
 }
 
-.bar-chart {
-  display: grid;
-  grid-template-columns: repeat(8, minmax(28px, 1fr));
-  align-items: end;
-  gap: 12px;
-  height: min(23vh, 215px);
-  padding: 16px 4px 0;
-  border-bottom: 1px solid #d8e5fb;
-}
-
-.bar-item {
-  display: grid;
-  grid-template-rows: 28px 1fr 24px;
-  gap: 8px;
-  align-items: end;
-  height: 100%;
-  min-width: 0;
-}
-
-.bar-item span {
-  align-self: start;
-  justify-self: center;
-  padding: 5px 7px;
-  border-radius: 999px;
-  color: var(--blue-dark);
-  background: #edf5ff;
-  font-size: 0.72rem;
-  font-weight: 950;
-}
-
-.bar-item i {
-  display: block;
-  width: 100%;
-  min-height: 18px;
-  border-radius: 12px 12px 4px 4px;
-  background: linear-gradient(180deg, #6c93ff 0%, #2f58c8 100%);
-}
-
-.bar-item em {
-  color: #637088;
-  font-size: 0.76rem;
-  font-style: normal;
-  font-weight: 900;
-  text-align: center;
-}
-
 .empty-chart {
   display: grid;
   place-items: center;
@@ -2307,32 +2358,68 @@ button:disabled {
   font-weight: 900;
 }
 
-.round-mini-list {
+.learning-chart {
   display: grid;
   gap: 12px;
 }
 
-.round-mini-list div {
-  display: grid;
-  gap: 8px;
-  min-height: 82px;
-  padding: 16px;
+.learning-chart svg {
+  width: 100%;
+  height: min(22vh, 190px);
+  padding: 6px;
   border-radius: 18px;
-  border: 1px solid #d8e5fb;
-  background: #f7fbff;
+  background: linear-gradient(180deg, #f7fbff, #eef5ff);
+  overflow: visible;
 }
 
-.round-mini-list span,
-.round-mini-list p {
-  margin: 0;
+.learning-chart polyline {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.learning-chart circle {
+  fill: #ffffff;
+  stroke: var(--blue);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.learning-stats,
+.learning-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
   color: #637088;
   font-weight: 900;
 }
 
-.round-mini-list strong {
-  color: var(--blue);
-  font-size: 1.9rem;
-  line-height: 1;
+.learning-stats span {
+  display: inline-grid;
+  place-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: var(--blue-dark);
+  background: #eef5ff;
+}
+
+.learning-empty {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 210px;
+  color: #637088;
+  text-align: center;
+  font-weight: 900;
+}
+
+.learning-empty strong {
+  color: var(--blue-dark);
+  font-size: 1.1rem;
 }
 
 .donut-wrap {
@@ -2705,7 +2792,7 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .chart-panel,
+  .learning-panel,
   .share-panel {
     grid-column: span 2;
   }
@@ -2718,8 +2805,8 @@ button:disabled {
   }
 
   .input-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    min-height: 138px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    min-height: 116px;
     padding: 18px 10px 12px;
     border-radius: 24px;
   }
@@ -2730,11 +2817,11 @@ button:disabled {
   }
 
   .input-grid span {
-    font-size: 1rem;
+    font-size: 0.88rem;
   }
 
   .field-input-wrap {
-    min-height: 50px;
+    min-height: 42px;
     padding: 0 3px;
   }
 
@@ -2744,12 +2831,12 @@ button:disabled {
 
   .input-grid input,
   .input-grid select {
-    min-height: 44px;
-    font-size: 1.08rem;
+    min-height: 38px;
+    font-size: 0.98rem;
   }
 
   .input-grid input::placeholder {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
   }
 
   .primary-button {
@@ -2876,7 +2963,9 @@ button:disabled {
   .config-actions,
   .config-card-head,
   .image-uploader,
-  .image-actions {
+  .image-actions,
+  .config-item-toolbar,
+  .pin-editor-form {
     grid-template-columns: 1fr;
   }
 
@@ -2888,6 +2977,16 @@ button:disabled {
     display: grid;
   }
 
+  .config-order-actions,
+  .item-order-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-right: 0;
+  }
+
+  .config-order-actions .remove-config-round {
+    grid-column: 1 / -1;
+  }
+
   .config-items {
     padding-left: 12px;
     padding-right: 12px;
@@ -2895,6 +2994,33 @@ button:disabled {
 }
 
 @media (max-width: 860px) {
+  .admin-login {
+    width: min(360px, calc(100% - 36px));
+    min-height: 100vh;
+    gap: 12px;
+    padding: 22px 0;
+  }
+
+  .admin-login-logo {
+    width: min(440px, 100%);
+  }
+
+  .admin-login h1 {
+    font-size: 1.85rem;
+  }
+
+  .admin-login input {
+    min-height: 48px;
+    border-radius: 14px;
+    font-size: 1rem;
+  }
+
+  .admin-login .primary-button {
+    min-height: 52px;
+    border-radius: 18px;
+    font-size: 1.15rem;
+  }
+
   .admin-body:has(.admin-mobile-view) {
     background: var(--gradient);
   }

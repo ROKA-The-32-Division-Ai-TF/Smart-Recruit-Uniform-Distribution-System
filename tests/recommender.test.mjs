@@ -5,13 +5,14 @@ import { REC_CONFIG, adjustRecConfigFromRecords, buildProfile, recommendForItem,
 const config = JSON.parse(await readFile(new URL("../docs/data/distribution-config.json", import.meta.url), "utf-8"));
 const itemMap = Object.fromEntries(config.items.map((item) => [item.itemId, item]));
 
-const validErrors = validateProfileInput({ recruitNo: "101", height: 176, weight: 72 }, [itemMap.combat_shoes, itemMap.beret]);
+const validErrors = validateProfileInput({ cohort: "26-1기", recruitNo: "101", height: 176, weight: 72 }, [itemMap.combat_shoes, itemMap.beret]);
 assert.deepEqual(validErrors, []);
 
-const invalidErrors = validateProfileInput({ recruitNo: "", height: 260, weight: 12 });
-assert.equal(invalidErrors.length, 3);
+const invalidErrors = validateProfileInput({ cohort: "", recruitNo: "", height: 260, weight: 12 });
+assert.equal(invalidErrors.length, 4);
 
-const profile = buildProfile({ recruitNo: "101", height: 176, weight: 72 });
+const profile = buildProfile({ cohort: "26-1기", recruitNo: "101", height: 176, weight: 72 });
+assert.equal(profile.cohort, "26-1기");
 assert.equal(profile.recruitNo, "101");
 assert.equal(profile.bmi, 23.2);
 

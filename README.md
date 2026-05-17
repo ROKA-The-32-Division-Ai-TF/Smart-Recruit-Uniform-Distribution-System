@@ -8,7 +8,7 @@
   - `index.html` - 신병 모바일 입력/추천/확정 화면
   - `admin.html` - 보급대 간부용 일자별 현황, 엑셀식 사이즈 필터, 개인별 현황, 품목/이미지/사이즈표 설정 화면
   - `data/distribution-config.json` - 차수, 품목, 사이즈, 이미지, 추천방식 설정
-  - `src/recommender.js` - 교번/키/몸무게 기반 임시 추천 알고리즘
+  - `src/recommender.js` - 기수/교번/키/몸무게 기반 추천 알고리즘
 - `apps-script/Code.gs` - Google Apps Script Web App API
 - `tests/` - 추천 로직 최소 검증
 
@@ -60,12 +60,12 @@ npm run test-api -- "관리자PIN"
 
 ## 데이터 저장 방식
 
-Google Sheets의 `raw_records`는 품목 1개당 1행으로 저장합니다.
+Google Sheets의 `raw_records`는 품목 1개당 1행으로 저장합니다. 개인정보 최소화를 위해 운영 저장값은 `기수`, `교번`, `추천/최종 사이즈`, `교체 여부` 중심이며, 키/몸무게/BMI 원문은 빈 칸으로 저장합니다.
 
-| submission_id | recruit_no | round_id | item_id | recommended_size | final_size | changed |
-| --- | --- | --- | --- | --- | --- | --- |
-| 001-round_1-... | 001 | round_1 | combat_top | 100-173 | 100-173 | N |
-| 001-round_1-... | 001 | round_1 | combat_bottom | 80-173 | 85-173 | Y |
+| submission_id | cohort | recruit_no | round_id | item_id | recommended_size | final_size | changed |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 26-1기-001-round_1-... | 26-1기 | 001 | round_1 | combat_top | 100-173 | 100-173 | N |
+| 26-1기-001-round_1-... | 26-1기 | 001 | round_1 | combat_bottom | 80-173 | 85-173 | Y |
 
 이 구조라서 품목이 늘어나도 관리자 집계가 깨지지 않습니다.
 
@@ -75,6 +75,8 @@ Google Sheets의 `raw_records`는 품목 1개당 1행으로 저장합니다.
 - `summary_by_size` - 차수/품목/사이즈별 수량
 - `summary_by_person` - 개인별 불출 현황
 - `exchange_summary` - 교체 건수/교체율
+- `ml_training` - 추천/최종 사이즈, 교체 여부, 구간화된 학습 지표
+- `ml_summary` - 일자별 학습 데이터 수와 추천 기준값 변화
 
 ## 품목/차수 추가
 
@@ -92,14 +94,15 @@ Google Sheets의 `raw_records`는 품목 1개당 1행으로 저장합니다.
 - `docs/data/distribution-config.json`의 Apps Script Web App URL은 공개 호출 주소입니다. 비밀키가 아니며, 실제 권한 검사는 Apps Script 서버 코드에서 처리합니다.
 - 관리자 조회와 설정 저장은 `ADMIN_PIN` 검증 후에만 실행됩니다.
 - Apps Script는 `ADMIN_PIN` 또는 `SPREADSHEET_ID` 속성이 없으면 기본값으로 동작하지 않고 실패합니다.
+- 신병의 정확한 키/몸무게/BMI는 서버 저장소로 보내지 않고 브라우저에서 추천 계산에만 사용합니다. 학습용으로는 구간화된 BMI/dis 값과 사이즈 교체 결과만 `ml_training`에 저장합니다.
 - 신병 제출 API는 QR 접속자가 써야 하므로 공개되어 있습니다. 운영 전에는 테스트 데이터 삭제와 관리자 PIN 변경을 권장합니다.
 
 ## 운영 흐름
 
 1. 신병이 QR로 접속
-2. 교번 / 키 / 몸무게 입력
-3. 시스템이 교번 기록을 조회
-4. 1차 미완료면 1차, 1차 완료면 2차, 전체 완료면 최종 내역 표시
+2. 기수 / 교번 / 키 / 몸무게 입력
+3. 시스템이 기수+교번 기록을 조회
+4. 이전 차수 기록을 기준으로 다음 미완료 차수 표시
 5. 품목별 추천 사이즈 확인
 6. 필요 시 사이즈 교체
 7. 최종 확정
