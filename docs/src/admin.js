@@ -120,25 +120,48 @@ function renderNavButton(view, label) {
 
 function renderDesktopOverview(summary, today, itemShares) {
   const learning = summary.learningSummary || { totalRows: 0, changedRows: 0, currentA: 24, history: [] };
+  const dashboardDate = today.date === "-" ? "전체" : formatKoreanDateLabel(today.date);
+  const exchangeRate = today.itemCount ? Number(((today.changedCount / today.itemCount) * 100).toFixed(1)) : 0;
+  const todayRecords = today.date === "-" ? summary.records || [] : filterRecordsByDate(summary.records || [], today.date);
+  const todaySummary = buildSummaryFromRecords(summary, todayRecords);
+  const shares = buildItemShares(todaySummary.sizeSummary);
+  const exchangeInsights = buildExchangeInsights(todayRecords);
+  const roundRows = buildRoundDashboardRows(todayRecords);
   return `
     <section class="dashboard-kpi-grid">
-      ${renderKpiCard("기준일 불출 품목", today.itemCount, "개", "primary")}
-      ${renderKpiCard("기준일 불출 인원", today.peopleCount, "명")}
-      ${renderKpiCard("학습 데이터", learning.totalRows, "건", "success")}
+      ${renderKpiCard(`${dashboardDate} 불출 품목`, today.itemCount, "개", "primary")}
+      ${renderKpiCard(`${dashboardDate} 불출 인원`, today.peopleCount, "명")}
+      ${renderKpiCard(`${dashboardDate} 교체율`, exchangeRate, "%", exchangeRate ? "danger" : "success")}
       ${renderKpiCard("누적 총 불출", summary.overview.totalItems, "개")}
+    </section>
+    <section class="dashboard-analytics-grid">
       <article class="dashboard-panel learning-panel">
         <div class="panel-title">
           <h2>추천 가중치 학습 현황</h2>
           <span>현재 기준값 ${Number(learning.currentA || 24).toFixed(2)}</span>
         </div>
-        ${renderLearningChart(learning)}
+        ${renderLearningTable(learning)}
       </article>
       <article class="dashboard-panel share-panel">
         <div class="panel-title">
           <h2>품목별 비중</h2>
-          <span>수량 기준</span>
+          <span>${esc(dashboardDate)} 기준</span>
         </div>
-        ${renderDonut(itemShares)}
+        ${renderDonut(shares)}
+      </article>
+      <article class="dashboard-panel exchange-panel">
+        <div class="panel-title">
+          <h2>교체 비율</h2>
+          <span>${exchangeInsights.changedCount.toLocaleString("ko-KR")}건 교체</span>
+        </div>
+        ${renderExchangePanel(exchangeInsights)}
+      </article>
+      <article class="dashboard-panel round-panel">
+        <div class="panel-title">
+          <h2>차수별 불출 현황</h2>
+          <span>${esc(dashboardDate)} 기준</span>
+        </div>
+        ${renderRoundDashboard(roundRows)}
       </article>
     </section>
   `;
@@ -812,6 +835,48 @@ function renderLearningChart(learning) {
   `;
 }
 
+function renderLearningTable(learning) {
+  const totalRows = Number(learning.totalRows || 0);
+  const changedRows = Number(learning.changedRows || 0);
+  const rate = totalRows ? Number(((changedRows / totalRows) * 100).toFixed(1)) : 0;
+  const history = (learning.history || []).slice(-5).reverse();
+  return `
+    <div class="learning-table-layout">
+      <table class="learning-metric-table">
+        <tbody>
+          <tr><th>현재 기준값 a</th><td>${Number(learning.currentA || 24).toFixed(2)}</td></tr>
+          <tr><th>학습 데이터</th><td>${totalRows.toLocaleString("ko-KR")}건</td></tr>
+          <tr><th>교체 데이터</th><td>${changedRows.toLocaleString("ko-KR")}건</td></tr>
+          <tr><th>교체율</th><td>${rate}%</td></tr>
+        </tbody>
+      </table>
+      <div class="learning-chart compact">
+        ${renderLearningChart(learning)}
+      </div>
+      <table class="learning-history-table">
+        <thead>
+          <tr>
+            <th>일자</th>
+            <th>학습</th>
+            <th>교체</th>
+            <th>a값</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${history.map((row) => `
+            <tr>
+              <td>${esc(row.date || "-")}</td>
+              <td>${Number(row.eventCount || 0).toLocaleString("ko-KR")}</td>
+              <td>${Number(row.changedCount || 0).toLocaleString("ko-KR")}</td>
+              <td>${Number(row.aValue || 24).toFixed(2)}</td>
+            </tr>
+          `).join("") || `<tr><td colspan="4">학습 기록이 아직 없습니다.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function buildItemShares(sizeRows) {
   const totals = new Map();
   sizeRows.forEach((row) => {
@@ -844,6 +909,95 @@ function renderDonut(items) {
           <span><i style="background:${item.color}"></i>${esc(item.label)} <b>${item.percent}%</b></span>
         `).join("")}
       </div>
+    </div>
+  `;
+}
+
+function buildExchangeInsights(records) {
+  const byItem = new Map();
+  let changedCount = 0;
+  records.forEach((row) => {
+    const itemName = String(row.item_name || "기타");
+    const changed = row.changed === "Y" || row.changed === true;
+    const entry = byItem.get(itemName) || { itemName, totalCount: 0, changedCount: 0, changeRate: 0 };
+    entry.totalCount += 1;
+    if (changed) {
+      entry.changedCount += 1;
+      changedCount += 1;
+    }
+    byItem.set(itemName, entry);
+  });
+  const totalCount = records.length;
+  const rows = [...byItem.values()]
+    .map((row) => ({
+      ...row,
+      changeRate: row.totalCount ? Number(((row.changedCount / row.totalCount) * 100).toFixed(1)) : 0
+    }))
+    .sort((a, b) => b.changedCount - a.changedCount || b.totalCount - a.totalCount)
+    .slice(0, 5);
+  return {
+    totalCount,
+    changedCount,
+    changeRate: totalCount ? Number(((changedCount / totalCount) * 100).toFixed(1)) : 0,
+    rows
+  };
+}
+
+function renderExchangePanel(insights) {
+  const rate = Number(insights.changeRate || 0);
+  return `
+    <div class="exchange-dashboard">
+      <div class="exchange-ring" style="--exchange-ring: conic-gradient(#ef4444 0 ${rate}%, #e8eefb ${rate}% 100%);">
+        <strong>${rate}%</strong>
+        <span>교체율</span>
+      </div>
+      <div class="exchange-bars">
+        ${insights.rows.map((row) => `
+          <div class="mini-bar-row">
+            <span>${esc(row.itemName)}</span>
+            <div><i style="width:${Math.min(100, row.changeRate)}%"></i></div>
+            <b>${row.changedCount.toLocaleString("ko-KR")}건</b>
+          </div>
+        `).join("") || `<p class="empty-chart compact-empty">교체 기록이 없습니다.</p>`}
+      </div>
+    </div>
+  `;
+}
+
+function buildRoundDashboardRows(records) {
+  const byRound = new Map();
+  records.forEach((row) => {
+    const roundId = String(row.round_id || "");
+    const roundName = String(row.round_name || roundId || "미지정");
+    const entry = byRound.get(roundId || roundName) || {
+      roundId,
+      roundName,
+      itemCount: 0,
+      people: new Set()
+    };
+    entry.itemCount += 1;
+    entry.people.add(personIdentity(row));
+    byRound.set(roundId || roundName, entry);
+  });
+  const rows = [...byRound.values()].map((row) => ({
+    ...row,
+    peopleCount: row.people.size
+  }));
+  const order = new Map((config.rounds || []).map((round, index) => [round.roundId, index]));
+  return rows.sort((a, b) => (order.get(a.roundId) ?? 999) - (order.get(b.roundId) ?? 999) || String(a.roundName).localeCompare(String(b.roundName), "ko"));
+}
+
+function renderRoundDashboard(rows) {
+  const max = Math.max(...rows.map((row) => row.itemCount), 1);
+  return `
+    <div class="round-dashboard-bars">
+      ${rows.map((row) => `
+        <div class="round-dashboard-row">
+          <strong>${esc(row.roundName)}</strong>
+          <div><i style="width:${Math.max(6, (row.itemCount / max) * 100)}%"></i></div>
+          <span>${row.itemCount.toLocaleString("ko-KR")}개 · ${row.peopleCount.toLocaleString("ko-KR")}명</span>
+        </div>
+      `).join("") || `<p class="empty-chart compact-empty">해당 날짜의 불출 기록이 없습니다.</p>`}
     </div>
   `;
 }
@@ -1038,6 +1192,12 @@ function formatDate(value) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function formatKoreanDateLabel(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return String(value || "-");
+  return `${Number(match[1])}년 ${Number(match[2])}월 ${Number(match[3])}일`;
 }
 
 function renderExcelFilterHeader(column, label, rows) {
@@ -1400,7 +1560,6 @@ function renderRoundComposition(round, items) {
   const itemMap = new Map(items.map((item) => [item.itemId, item]));
   const assignedIds = uniqueOrdered((round.itemIds || []).map(String)).filter((itemId) => itemMap.has(itemId));
   const assigned = assignedIds.map((itemId) => itemMap.get(itemId));
-  const unused = items.filter((item) => !assignedIds.includes(item.itemId));
   return `
     <article class="round-composition" data-round-composition data-round-id="${esc(round.roundId)}">
       <header>
@@ -1409,12 +1568,6 @@ function renderRoundComposition(round, items) {
       </header>
       <div class="round-item-dropzone" data-round-items="${esc(round.roundId)}">
         ${assigned.map(renderRoundCompositionItem).join("") || `<p class="round-empty">아직 포함된 품목이 없습니다.</p>`}
-      </div>
-      <div class="round-add-row">
-        <select data-add-round-item aria-label="${esc(round.label)} 품목 추가">
-          <option value="">품목 선택</option>
-          ${unused.map((item) => `<option value="${esc(item.itemId)}">${esc(item.label)}</option>`).join("")}
-        </select>
       </div>
     </article>
   `;
@@ -1449,6 +1602,7 @@ function bindConfigEditor() {
     bindConfigItem(node);
     refreshConfigOrders();
     refreshRoundCompositionEditor();
+    addItemToFirstRoundComposition(item);
     node.scrollIntoView({ block: "start" });
     node.querySelector('[data-field="label"]')?.focus();
   });
@@ -1556,18 +1710,6 @@ function bindConfigItem(node) {
 function bindRoundCompositionEditor() {
   document.querySelectorAll("[data-round-composition]").forEach((panel) => {
     const zone = panel.querySelector("[data-round-items]");
-    const select = panel.querySelector("[data-add-round-item]");
-    select?.addEventListener("change", () => {
-      const itemId = select?.value || "";
-      if (!itemId) return;
-      const item = readItemEditorEntries().find((candidate) => candidate.itemId === itemId);
-      if (!item) return;
-      zone.querySelector(".round-empty")?.remove();
-      zone.insertAdjacentHTML("beforeend", renderRoundCompositionItem(item));
-      bindRoundCompositionChip(zone.lastElementChild);
-      select.value = "";
-      refreshRoundCompositionSelects();
-    });
     zone.addEventListener("dragover", (event) => {
       event.preventDefault();
       const dragging = draggedRoundItem;
@@ -1589,6 +1731,15 @@ function bindRoundCompositionEditor() {
     });
   });
   document.querySelectorAll(".round-item-chip").forEach(bindRoundCompositionChip);
+  refreshRoundCompositionSelects();
+}
+
+function addItemToFirstRoundComposition(item) {
+  const zone = document.querySelector("[data-round-items]");
+  if (!zone || zone.querySelector(`[data-round-item-id="${cssEscape(item.itemId)}"]`)) return;
+  zone.querySelector(".round-empty")?.remove();
+  zone.insertAdjacentHTML("beforeend", renderRoundCompositionItem(item));
+  bindRoundCompositionChip(zone.lastElementChild);
   refreshRoundCompositionSelects();
 }
 
@@ -1644,19 +1795,8 @@ function refreshRoundCompositionEditor() {
 }
 
 function refreshRoundCompositionSelects() {
-  const items = readItemEditorEntries();
   document.querySelectorAll("[data-round-composition]").forEach((panel) => {
     const assigned = new Set([...panel.querySelectorAll("[data-round-item-id]")].map((chip) => chip.dataset.roundItemId));
-    const select = panel.querySelector("[data-add-round-item]");
-    const unused = items.filter((item) => !assigned.has(item.itemId));
-    if (!select) return;
-    const previous = select.value;
-    select.innerHTML = `
-      <option value="">품목 선택</option>
-      ${unused.map((item) => `<option value="${esc(item.itemId)}">${esc(item.label)}</option>`).join("")}
-    `;
-    if (unused.some((item) => item.itemId === previous)) select.value = previous;
-    select.disabled = unused.length === 0;
     panel.querySelector("header span").textContent = `${assigned.size.toLocaleString("ko-KR")}개 품목`;
   });
 }
