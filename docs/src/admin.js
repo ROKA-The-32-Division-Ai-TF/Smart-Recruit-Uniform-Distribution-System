@@ -17,6 +17,7 @@ let selectedIssueDate = "all";
 let selectedMobileDate = "";
 let selectedMobileItemId = "all";
 let mobilePersonQuery = "";
+let draggedRoundItem = null;
 const expandedConfigItems = new Set();
 
 init();
@@ -120,14 +121,6 @@ function renderNavButton(view, label) {
 function renderDesktopOverview(summary, today, itemShares) {
   const learning = summary.learningSummary || { totalRows: 0, changedRows: 0, currentA: 24, history: [] };
   return `
-    <section class="dashboard-hero">
-      <div>
-        <h1>백룡 피복불출 대시보드</h1>
-        <p>기준일 ${esc(today.date)}</p>
-      </div>
-      <span>전체 요약</span>
-    </section>
-
     <section class="dashboard-kpi-grid">
       ${renderKpiCard("기준일 불출 품목", today.itemCount, "개", "primary")}
       ${renderKpiCard("기준일 불출 인원", today.peopleCount, "명")}
@@ -153,11 +146,7 @@ function renderDesktopOverview(summary, today, itemShares) {
 
 function renderIssueView(issueSummary, dailySummary) {
   return `
-    <section class="desktop-view-head">
-      <div>
-        <h1>불출현황</h1>
-        <p>일자별로 불출 수량과 개인별 현황을 확인합니다.</p>
-      </div>
+    <section class="view-control-bar">
       <label class="date-filter">
         일자
         <select id="issueDateFilter">
@@ -194,23 +183,13 @@ function renderIssueAccordion(panel, title, description, content) {
 
 function renderSettingsView(notice) {
   return `
-    <section class="desktop-view-head">
-      <div>
-        <h1>사이즈 품목 추가/수정</h1>
-        <p>품목 카드를 열어 이미지, 차수, 사이즈표를 관리합니다.</p>
-      </div>
-    </section>
     ${renderConfigEditor(notice)}
   `;
 }
 
 function renderAdminSettingsView(notice) {
   return `
-    <section class="desktop-view-head">
-      <div>
-        <h1>관리자 설정</h1>
-        <p>PIN, 기수, 제작자 정보와 시스템 흐름을 관리합니다.</p>
-      </div>
+    <section class="view-control-bar align-right">
       <button id="saveAdminSettings" class="secondary-button strong settings-save-button" type="button">설정 저장</button>
     </section>
     <p id="adminSettingsNotice" class="config-notice">${esc(notice)}</p>
@@ -219,6 +198,7 @@ function renderAdminSettingsView(notice) {
       ${renderCohortEditor()}
       ${renderCreatorPanel()}
       ${renderSystemFlowPanel()}
+      ${renderLearningFlowPanel()}
     </div>
   `;
 }
@@ -293,7 +273,7 @@ function renderCohortEntry(cohort, index) {
 }
 
 function renderCreatorPanel() {
-  const creators = config.metadata?.creators?.length ? config.metadata.creators : ["제32보병사단 AI TF", "백룡 AI The One"];
+  const creators = config.metadata?.creators?.length ? config.metadata.creators : defaultCreators();
   return `
     <section class="admin-section creator-panel">
       <div class="section-head">
@@ -338,6 +318,66 @@ function renderSystemFlowPanel() {
       </div>
     </section>
   `;
+}
+
+function renderLearningFlowPanel() {
+  const steps = [
+    ["확정", "추천 사이즈와 실제 확정 사이즈를 비교합니다."],
+    ["교체 신호", "작게 바꿨는지, 크게 바꿨는지 방향을 남깁니다."],
+    ["학습 저장", "Google Sheets의 ml_training에 학습용 기록이 쌓입니다."],
+    ["평균 확인", "하루 단위로 교체가 어느 쪽으로 많았는지 봅니다."],
+    ["기준 조정", "a값을 아주 조금 움직여 다음 추천을 보정합니다."],
+    ["다음 추천", "새 기록이 쌓일수록 추천 기준이 현장에 가까워집니다."]
+  ];
+  return `
+    <section class="admin-section learning-flow-panel">
+      <div class="section-head">
+        <div>
+          <h2>백룡AI 학습 방식</h2>
+          <p>교체 기록이 쌓이면 추천 기준을 조금씩 조정합니다.</p>
+        </div>
+      </div>
+      <div class="flow-lane learning-flow-lane">
+        ${steps.map(([title, description], index) => `
+          <div class="flow-step">
+            <b>${String(index + 1).padStart(2, "0")}</b>
+            <strong>${esc(title)}</strong>
+            <span>${esc(description)}</span>
+          </div>
+        `).join("")}
+      </div>
+      <div class="learning-explain-grid">
+        <article class="formula-card">
+          <strong>계산은 이렇게 봅니다</strong>
+          <p>BMI = 몸무게 ÷ (키m × 키m)</p>
+          <p>기준 BMI 24보다 크면 조금 큰 쪽, 작으면 조금 작은 쪽으로 추천합니다.</p>
+          <p>교체가 계속 한 방향으로 생기면 기준값 a를 조금 움직입니다.</p>
+        </article>
+        <article class="sample-learning-card">
+          <strong>그래프 예시</strong>
+          <svg viewBox="0 0 220 94" role="img" aria-label="학습 기준값 예시 그래프">
+            <line x1="12" y1="76" x2="208" y2="76" />
+            <line x1="12" y1="12" x2="12" y2="76" />
+            <polyline points="12,56 52,52 92,58 132,42 172,37 208,29" />
+            <circle cx="12" cy="56" r="4" />
+            <circle cx="52" cy="52" r="4" />
+            <circle cx="92" cy="58" r="4" />
+            <circle cx="132" cy="42" r="4" />
+            <circle cx="172" cy="37" r="4" />
+            <circle cx="208" cy="29" r="4" />
+          </svg>
+          <p>점이 위로 가면 추천 기준이 조금 커진다는 뜻입니다. 한 번에 확 바뀌지 않고 기록이 쌓일 때마다 천천히 움직입니다.</p>
+        </article>
+      </div>
+    </section>
+  `;
+}
+
+function defaultCreators() {
+  return [
+    "제32보병사단 AI TF",
+    "대위 정동호 · 9급 전재문 · 병장 김지성 · 병장 김준우 · 상병 김민규 · 일병 임다민 · 일병 전호성"
+  ];
 }
 
 function bindDesktopNav() {
@@ -796,12 +836,9 @@ function renderDonut(items) {
 function renderSizeSummaryPanel(summary) {
   return `
     <section class="admin-section desktop-only dashboard-table-panel">
-      <div class="section-head">
-        <div>
-          <h2>사이즈별 불출 수량</h2>
-          <p>표 제목의 필터 버튼으로 엑셀처럼 골라 볼 수 있습니다.</p>
-        </div>
-        <button class="secondary-button print-report-button" data-print-report="size" type="button">필터 결과 인쇄</button>
+      <div class="table-action-bar">
+        <span>표 제목의 필터 버튼으로 골라 볼 수 있습니다.</span>
+        <button class="secondary-button print-report-button" data-print-report="size" type="button">인쇄</button>
       </div>
       <div class="table-wrap">
         <table class="admin-table excel-table" id="sizeTable">
@@ -830,12 +867,9 @@ function renderSizeSummaryPanel(summary) {
 function renderPersonPanel(summary) {
   return `
     <section class="admin-section desktop-only dashboard-table-panel">
-      <div class="section-head">
-        <div>
-          <h2>개인별 불출 현황</h2>
-          <p>품목이 추가되어도 설정 파일 기준으로 열이 자동 생성됩니다.</p>
-        </div>
-        <button class="secondary-button print-report-button" data-print-report="person" type="button">현재 목록 인쇄</button>
+      <div class="table-action-bar">
+        <span><i class="exchange-dot"></i>빨간색 행은 교체 이력이 있는 인원입니다.</span>
+        <button class="secondary-button print-report-button" data-print-report="person" type="button">인쇄</button>
       </div>
       <div class="table-wrap">
         <table class="admin-table" id="personTable">
@@ -845,11 +879,10 @@ function renderPersonPanel(summary) {
               <th>교번</th>
               <th>차수</th>
               ${summary.personColumns.map((column) => `<th>${esc(column)}</th>`).join("")}
-              <th>교체</th>
             </tr>
           </thead>
           <tbody>
-            ${summary.personSummary.map((row) => renderPersonRow(row, summary.personColumns)).join("") || `<tr><td colspan="${summary.personColumns.length + 4}">저장된 불출 내역이 없습니다.</td></tr>`}
+            ${summary.personSummary.map((row) => renderPersonRow(row, summary.personColumns)).join("") || `<tr><td colspan="${summary.personColumns.length + 3}">저장된 불출 내역이 없습니다.</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -1128,12 +1161,11 @@ function renderSizeRow(row) {
 
 function renderPersonRow(row, columns) {
   return `
-    <tr>
+    <tr class="${row.changedCount ? "changed-person-row" : ""}">
       <td>${esc(row.cohort || "-")}</td>
       <td><strong>${esc(row.recruitNo)}</strong></td>
       <td>${esc(row.roundName)}</td>
       ${columns.map((column) => `<td>${esc(row.items[column] || "-")}</td>`).join("")}
-      <td>${row.changedCount ? "있음" : "없음"}</td>
     </tr>
   `;
 }
@@ -1142,18 +1174,24 @@ function printIssueReport(type) {
   const title = type === "person" ? "개인별 불출 현황" : "사이즈별 불출 수량";
   const rows = type === "person" ? currentIssueSummary?.personSummary || [] : visibleSizeSummary || [];
   const columns = type === "person"
-    ? ["기수", "교번", "차수", ...(currentIssueSummary?.personColumns || []), "교체"]
+    ? ["기수", "교번", "차수", ...(currentIssueSummary?.personColumns || [])]
     : ["차수", "품목", "사이즈", "수량", "교체"];
   const bodyRows = type === "person"
-    ? rows.map((row) => [
-        row.cohort || "-",
-        row.recruitNo,
-        row.roundName,
-        ...(currentIssueSummary?.personColumns || []).map((column) => row.items[column] || "-"),
-        row.changedCount ? "있음" : "없음"
-      ])
-    : rows.map((row) => [row.roundName, row.itemName, row.size, row.count, row.changedCount]);
+    ? rows.map((row) => ({
+        changed: Number(row.changedCount || 0) > 0,
+        cells: [
+          row.cohort || "-",
+          row.recruitNo,
+          row.roundName,
+          ...(currentIssueSummary?.personColumns || []).map((column) => row.items[column] || "-")
+        ]
+      }))
+    : rows.map((row) => ({
+        changed: false,
+        cells: [row.roundName, row.itemName, row.size, row.count, row.changedCount]
+      }));
   const dateText = selectedIssueDate === "all" ? "전체 기간" : selectedIssueDate;
+  const fontSize = Math.max(7, Math.min(11, 13 - columns.length * 0.25));
   const html = `
     <!doctype html>
     <html lang="ko">
@@ -1161,25 +1199,34 @@ function printIssueReport(type) {
         <meta charset="UTF-8" />
         <title>${esc(title)}</title>
         <style>
-          @page { size: A4 landscape; margin: 12mm; }
-          body { margin: 0; color: #111827; font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
-          h1 { margin: 0 0 4px; color: #17377d; font-size: 22px; }
-          p { margin: 0 0 14px; color: #5f6b80; font-weight: 700; }
-          table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: auto; }
-          th, td { border: 1px solid #cbd5e1; padding: 7px 8px; text-align: left; white-space: nowrap; }
+          @page { size: A4 landscape; margin: 8mm; }
+          * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          html, body { width: 100%; margin: 0; }
+          body { color: #111827; font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+          .print-sheet { width: 100%; page-break-inside: avoid; }
+          h1 { margin: 0 0 4px; color: #17377d; font-size: 20px; line-height: 1.1; }
+          p { margin: 0 0 10px; color: #5f6b80; font-size: 11px; font-weight: 700; }
+          table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: ${fontSize}px; }
+          th, td { border: 1px solid #cbd5e1; padding: 5px 6px; text-align: left; white-space: normal; overflow-wrap: anywhere; line-height: 1.22; }
           th { color: #17377d; background: #eef4ff; font-weight: 900; }
           td { font-weight: 700; }
+          tr.changed td { background: #fff1f2; color: #991b1b; }
+          .legend { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; color: #991b1b; font-size: 10px; font-weight: 800; }
+          .legend i { width: 10px; height: 10px; border-radius: 999px; background: #ef4444; }
         </style>
       </head>
       <body>
-        <h1>${esc(title)}</h1>
-        <p>${esc(dateText)} · ${bodyRows.length.toLocaleString("ko-KR")}건</p>
-        <table>
-          <thead><tr>${columns.map((column) => `<th>${esc(column)}</th>`).join("")}</tr></thead>
-          <tbody>
-            ${bodyRows.map((row) => `<tr>${row.map((cell) => `<td>${esc(cell)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${columns.length}">인쇄할 내역이 없습니다.</td></tr>`}
-          </tbody>
-        </table>
+        <main class="print-sheet">
+          <h1>${esc(title)}</h1>
+          <p>${esc(dateText)} · ${bodyRows.length.toLocaleString("ko-KR")}건</p>
+          ${type === "person" ? `<div class="legend"><i></i>빨간색 행은 교체 이력이 있는 인원입니다.</div>` : ""}
+          <table>
+            <thead><tr>${columns.map((column) => `<th>${esc(column)}</th>`).join("")}</tr></thead>
+            <tbody>
+              ${bodyRows.map((row) => `<tr class="${row.changed ? "changed" : ""}">${row.cells.map((cell) => `<td>${esc(cell)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${columns.length}">인쇄할 내역이 없습니다.</td></tr>`}
+            </tbody>
+          </table>
+        </main>
         <script>window.addEventListener("load", () => { window.print(); });</script>
       </body>
     </html>
@@ -1195,15 +1242,19 @@ function uniqueValues(values) {
   return [...new Set(values.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), "ko"));
 }
 
+function uniqueOrdered(values) {
+  const seen = new Set();
+  return values.filter((value) => {
+    if (!value || seen.has(value)) return false;
+    seen.add(value);
+    return true;
+  });
+}
+
 function renderConfigEditor(notice = "") {
-  const roundMap = Object.fromEntries(config.rounds.map((round) => [round.roundId, new Set(round.itemIds || [])]));
   return `
     <section class="admin-section config-section">
-      <div class="section-head">
-        <div>
-          <h2>차수 / 품목 / 사이즈표 설정</h2>
-          <p>차수를 추가한 뒤 품목 카드에서 해당 차수 포함 여부를 선택합니다.</p>
-        </div>
+      <div class="config-toolbar">
         <div class="config-actions">
           <button id="addConfigRound" class="secondary-button" type="button">차수 추가</button>
           <button id="addConfigItem" class="secondary-button" type="button">품목 추가</button>
@@ -1213,8 +1264,9 @@ function renderConfigEditor(notice = "") {
       <p id="configNotice" class="config-notice">${esc(notice)}</p>
       ${renderRoundEditor(config.rounds)}
       <div id="configItems" class="config-items">
-        ${config.items.map((item) => renderConfigItem(item, roundMap, config.rounds)).join("")}
+        ${config.items.map((item) => renderConfigItem(item)).join("")}
       </div>
+      ${renderRoundCompositionEditor(config.rounds, config.items)}
     </section>
   `;
 }
@@ -1253,7 +1305,7 @@ function renderConfigRound(round, index) {
   `;
 }
 
-function renderConfigItem(item, roundMap, rounds = config.rounds) {
+function renderConfigItem(item) {
   const expanded = expandedConfigItems.has(item.itemId);
   return `
     <article class="config-item ${expanded ? "open" : ""}" data-config-item data-config-item-id="${esc(item.itemId)}">
@@ -1271,10 +1323,6 @@ function renderConfigItem(item, roundMap, rounds = config.rounds) {
           </span>
           <b>${expanded ? "접기" : "열기"}</b>
         </button>
-        <div class="config-order-actions item-order-actions">
-          <button data-move-item="up" type="button">위</button>
-          <button data-move-item="down" type="button">아래</button>
-        </div>
       </div>
       <div class="config-item-body" ${expanded ? "" : "hidden"}>
         <div class="config-card-head">
@@ -1296,10 +1344,6 @@ function renderConfigItem(item, roundMap, rounds = config.rounds) {
             <button class="secondary-button clear-image" data-clear-image type="button">이미지 삭제</button>
           </div>
         </div>
-        <fieldset class="round-checks">
-          <legend>불출 차수 포함</legend>
-          ${rounds.map((round) => renderRoundCheck(round, roundMap[round.roundId]?.has(item.itemId))).join("")}
-        </fieldset>
         <section class="sizes-editor">
           <div class="sizes-editor-head">
             <h3>사이즈표 추가 / 수정</h3>
@@ -1314,12 +1358,54 @@ function renderConfigItem(item, roundMap, rounds = config.rounds) {
   `;
 }
 
-function renderRoundCheck(round, checked = false) {
+function renderRoundCompositionEditor(rounds, items) {
   return `
-    <label data-round-wrap="${esc(round.roundId)}">
-      <input data-round="${esc(round.roundId)}" type="checkbox" ${checked ? "checked" : ""} />
-      <span data-round-label-display="${esc(round.roundId)}">${esc(round.label)}</span>
-    </label>
+    <section class="round-composition-editor">
+      <div class="round-composition-head">
+        <div>
+          <h3>차수별 구성 / 불출 순서</h3>
+          <p>품목을 차수에 추가한 뒤 마우스로 끌어서 신병 화면 표시 순서를 바꿉니다.</p>
+        </div>
+      </div>
+      <div id="roundCompositions" class="round-composition-list">
+        ${(rounds || []).map((round) => renderRoundComposition(round, items)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderRoundComposition(round, items) {
+  const itemMap = new Map(items.map((item) => [item.itemId, item]));
+  const assignedIds = uniqueOrdered((round.itemIds || []).map(String)).filter((itemId) => itemMap.has(itemId));
+  const assigned = assignedIds.map((itemId) => itemMap.get(itemId));
+  const unused = items.filter((item) => !assignedIds.includes(item.itemId));
+  return `
+    <article class="round-composition" data-round-composition data-round-id="${esc(round.roundId)}">
+      <header>
+        <strong data-composition-title="${esc(round.roundId)}">${esc(round.label)}</strong>
+        <span>${assigned.length.toLocaleString("ko-KR")}개 품목</span>
+      </header>
+      <div class="round-item-dropzone" data-round-items="${esc(round.roundId)}">
+        ${assigned.map(renderRoundCompositionItem).join("") || `<p class="round-empty">아직 포함된 품목이 없습니다.</p>`}
+      </div>
+      <div class="round-add-row">
+        <select data-add-round-item aria-label="${esc(round.label)} 품목 추가">
+          <option value="">품목 선택</option>
+          ${unused.map((item) => `<option value="${esc(item.itemId)}">${esc(item.label)}</option>`).join("")}
+        </select>
+        <button class="secondary-button" data-add-round-item-button type="button" ${unused.length ? "" : "disabled"}>추가</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderRoundCompositionItem(item) {
+  return `
+    <div class="round-item-chip" draggable="true" data-round-item-id="${esc(item.itemId)}">
+      <span class="drag-handle" aria-hidden="true">↕</span>
+      <strong>${esc(item.label)}</strong>
+      <button data-remove-round-item type="button" aria-label="${esc(item.label)} 제외">삭제</button>
+    </div>
   `;
 }
 
@@ -1328,7 +1414,6 @@ function bindConfigEditor() {
   document.querySelector("#addConfigItem").addEventListener("click", () => {
     const container = document.querySelector("#configItems");
     const itemId = `custom_${Date.now()}`;
-    const rounds = readRoundEditorEntries();
     const item = {
       itemId,
       label: "새 품목",
@@ -1337,18 +1422,19 @@ function bindConfigEditor() {
       order: 0,
       sizes: []
     };
-    const roundMap = Object.fromEntries(rounds.map((round, index) => [round.roundId, new Set(index === 0 ? [itemId] : [])]));
     expandedConfigItems.add(itemId);
-    container.insertAdjacentHTML("afterbegin", renderConfigItem(item, roundMap, rounds));
+    container.insertAdjacentHTML("afterbegin", renderConfigItem(item));
     const node = container.firstElementChild;
     bindConfigItem(node);
     refreshConfigOrders();
+    refreshRoundCompositionEditor();
     node.scrollIntoView({ block: "start" });
     node.querySelector('[data-field="label"]')?.focus();
   });
   document.querySelector("#saveConfig").addEventListener("click", saveConfigFromEditor);
   document.querySelectorAll("[data-config-round]").forEach(bindConfigRound);
   document.querySelectorAll("[data-config-item]").forEach(bindConfigItem);
+  bindRoundCompositionEditor();
 }
 
 function addConfigRound() {
@@ -1364,10 +1450,8 @@ function addConfigRound() {
   container.insertAdjacentHTML("beforeend", renderConfigRound(round, rounds.length));
   bindConfigRound(container.lastElementChild);
   refreshConfigOrders();
-  document.querySelectorAll("[data-config-item] .round-checks").forEach((fieldset) => {
-    fieldset.insertAdjacentHTML("beforeend", renderRoundCheck(round, false));
-  });
-  setConfigNotice(`${round.label}을 추가했습니다. 품목 카드에서 포함할 품목을 선택해 주세요.`);
+  refreshRoundCompositionEditor();
+  setConfigNotice(`${round.label}을 추가했습니다. 아래 차수별 구성에서 품목을 넣어 주세요.`);
   container.lastElementChild.querySelector('[data-round-field="label"]')?.focus();
 }
 
@@ -1376,9 +1460,7 @@ function bindConfigRound(node) {
   const idInput = node.querySelector('[data-round-field="roundId"]');
   labelInput.addEventListener("input", () => {
     const label = labelInput.value.trim() || "새 차수";
-    document.querySelectorAll(`[data-round-label-display="${idInput.value}"]`).forEach((target) => {
-      target.textContent = label;
-    });
+    document.querySelector(`[data-composition-title="${cssEscape(idInput.value)}"]`)?.replaceChildren(document.createTextNode(label));
   });
   node.querySelectorAll("[data-move-round]").forEach((button) => {
     button.onclick = () => {
@@ -1394,8 +1476,8 @@ function bindConfigRound(node) {
     }
     const label = labelInput.value.trim() || "차수";
     node.remove();
-    document.querySelectorAll(`[data-round-wrap="${idInput.value}"]`).forEach((target) => target.remove());
     refreshConfigOrders();
+    refreshRoundCompositionEditor();
     setConfigNotice(`${label}을 삭제했습니다. 설정 저장을 누르면 반영됩니다.`);
   };
 }
@@ -1437,20 +1519,135 @@ function bindConfigItem(node) {
     }
   };
   labelInput?.addEventListener("input", () => {
-    node.querySelector("[data-config-title]").textContent = labelInput.value.trim() || "새 품목";
-  });
-  node.querySelectorAll("[data-move-item]").forEach((button) => {
-    button.onclick = () => {
-      moveConfigNode(node, button.dataset.moveItem, "[data-config-item]");
-      refreshConfigOrders();
-    };
+    const label = labelInput.value.trim() || "새 품목";
+    node.querySelector("[data-config-title]").textContent = label;
+    updateRoundCompositionItemLabel(itemIdInput.value, label);
   });
   node.querySelector(".remove-config-item").onclick = () => {
     node.remove();
     refreshConfigOrders();
+    refreshRoundCompositionEditor();
   };
   bindImageUploader(node);
   bindSizeEditor(node);
+}
+
+function bindRoundCompositionEditor() {
+  document.querySelectorAll("[data-round-composition]").forEach((panel) => {
+    const zone = panel.querySelector("[data-round-items]");
+    const select = panel.querySelector("[data-add-round-item]");
+    panel.querySelector("[data-add-round-item-button]")?.addEventListener("click", () => {
+      const itemId = select?.value || "";
+      if (!itemId) return;
+      const item = readItemEditorEntries().find((candidate) => candidate.itemId === itemId);
+      if (!item) return;
+      zone.querySelector(".round-empty")?.remove();
+      zone.insertAdjacentHTML("beforeend", renderRoundCompositionItem(item));
+      bindRoundCompositionChip(zone.lastElementChild);
+      refreshRoundCompositionSelects();
+    });
+    zone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      const dragging = draggedRoundItem;
+      if (!dragging || dragging === zone) return;
+      const duplicate = [...zone.querySelectorAll("[data-round-item-id]")]
+        .some((chip) => chip !== dragging && chip.dataset.roundItemId === dragging.dataset.roundItemId);
+      if (duplicate) return;
+      zone.querySelector(".round-empty")?.remove();
+      const afterElement = getDragAfterElement(zone, event.clientY);
+      if (afterElement) {
+        zone.insertBefore(dragging, afterElement);
+      } else {
+        zone.appendChild(dragging);
+      }
+    });
+    zone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      refreshRoundCompositionSelects();
+    });
+  });
+  document.querySelectorAll(".round-item-chip").forEach(bindRoundCompositionChip);
+  refreshRoundCompositionSelects();
+}
+
+function bindRoundCompositionChip(chip) {
+  chip.addEventListener("dragstart", (event) => {
+    draggedRoundItem = chip;
+    chip.classList.add("dragging");
+    event.dataTransfer.effectAllowed = "move";
+  });
+  chip.addEventListener("dragend", () => {
+    chip.classList.remove("dragging");
+    draggedRoundItem = null;
+    document.querySelectorAll("[data-round-items]").forEach((zone) => {
+      if (!zone.querySelector("[data-round-item-id]")) {
+        zone.innerHTML = `<p class="round-empty">아직 포함된 품목이 없습니다.</p>`;
+      }
+    });
+    refreshRoundCompositionSelects();
+  });
+  chip.querySelector("[data-remove-round-item]")?.addEventListener("click", () => {
+    const zone = chip.closest("[data-round-items]");
+    chip.remove();
+    if (zone && !zone.querySelector("[data-round-item-id]")) {
+      zone.innerHTML = `<p class="round-empty">아직 포함된 품목이 없습니다.</p>`;
+    }
+    refreshRoundCompositionSelects();
+  });
+}
+
+function getDragAfterElement(container, y) {
+  const elements = [...container.querySelectorAll(".round-item-chip:not(.dragging)")];
+  return elements.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset, element: child };
+    }
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+}
+
+function refreshRoundCompositionEditor() {
+  const container = document.querySelector("#roundCompositions");
+  if (!container) return;
+  const composition = readRoundCompositionEntries();
+  const rounds = readRoundEditorEntries().map((round) => ({
+    ...round,
+    itemIds: composition[round.roundId] || []
+  }));
+  const items = readItemEditorEntries();
+  container.innerHTML = rounds.map((round) => renderRoundComposition(round, items)).join("");
+  bindRoundCompositionEditor();
+}
+
+function refreshRoundCompositionSelects() {
+  const items = readItemEditorEntries();
+  document.querySelectorAll("[data-round-composition]").forEach((panel) => {
+    const assigned = new Set([...panel.querySelectorAll("[data-round-item-id]")].map((chip) => chip.dataset.roundItemId));
+    const select = panel.querySelector("[data-add-round-item]");
+    const button = panel.querySelector("[data-add-round-item-button]");
+    const unused = items.filter((item) => !assigned.has(item.itemId));
+    if (!select) return;
+    const previous = select.value;
+    select.innerHTML = `
+      <option value="">품목 선택</option>
+      ${unused.map((item) => `<option value="${esc(item.itemId)}">${esc(item.label)}</option>`).join("")}
+    `;
+    if (unused.some((item) => item.itemId === previous)) select.value = previous;
+    if (button) button.disabled = unused.length === 0;
+    panel.querySelector("header span").textContent = `${assigned.size.toLocaleString("ko-KR")}개 품목`;
+  });
+}
+
+function updateRoundCompositionItemLabel(itemId, label) {
+  document.querySelectorAll("[data-round-item-id]").forEach((chip) => {
+    if (chip.dataset.roundItemId === itemId) {
+      chip.querySelector("strong").textContent = label;
+      chip.querySelector("[data-remove-round-item]")?.setAttribute("aria-label", `${label} 제외`);
+    }
+  });
+  refreshRoundCompositionSelects();
 }
 
 function moveConfigNode(node, direction, selector) {
@@ -1496,6 +1693,32 @@ function readRoundEditorEntries() {
       itemIds: []
     };
   });
+}
+
+function readItemEditorEntries() {
+  return [...document.querySelectorAll("[data-config-item]")].map((node, index) => {
+    const get = (field) => node.querySelector(`[data-field="${field}"]`)?.value?.trim() || "";
+    const itemId = sanitizeItemId(get("itemId") || `item_${index + 1}`);
+    return {
+      itemId,
+      label: get("label") || itemId,
+      recommendationType: get("recommendationType") || "manual",
+      image: get("image"),
+      imagePosition: get("imagePosition") || "center",
+      imageSize: get("imageSize") || "contain",
+      order: index + 1,
+      sizes: [...node.querySelectorAll("[data-size-entry] input")]
+        .map((input) => input.value.trim())
+        .filter(Boolean)
+    };
+  });
+}
+
+function readRoundCompositionEntries() {
+  return Object.fromEntries([...document.querySelectorAll("[data-round-composition]")].map((panel) => [
+    panel.dataset.roundId,
+    [...panel.querySelectorAll("[data-round-item-id]")].map((chip) => chip.dataset.roundItemId).filter(Boolean)
+  ]));
 }
 
 function nextRoundNumber(rounds) {
@@ -1633,7 +1856,6 @@ async function saveConfigFromEditor() {
 }
 
 function collectConfigFromEditor() {
-  const itemNodes = [...document.querySelectorAll("[data-config-item]")];
   const roundNodes = [...document.querySelectorAll("[data-config-round]")];
   if (!roundNodes.length) throw new Error("불출 차수는 최소 1개가 필요합니다.");
 
@@ -1651,34 +1873,21 @@ function collectConfigFromEditor() {
   });
 
   const seen = new Set();
-  const items = itemNodes.map((node, index) => {
-    const get = (field) => node.querySelector(`[data-field="${field}"]`)?.value?.trim() || "";
-    const itemId = sanitizeItemId(get("itemId") || `item_${index + 1}`);
+  const items = readItemEditorEntries().map((item) => {
+    const itemId = sanitizeItemId(item.itemId);
     if (seen.has(itemId)) throw new Error(`품목 ID가 중복되었습니다: ${itemId}`);
     seen.add(itemId);
-    const sizes = [...node.querySelectorAll("[data-size-entry] input")]
-      .map((input) => input.value.trim())
-      .filter(Boolean);
     return {
+      ...item,
       itemId,
-      label: get("label") || itemId,
-      recommendationType: get("recommendationType") || "manual",
-      image: get("image"),
-      imagePosition: get("imagePosition") || "center",
-      imageSize: get("imageSize") || "contain",
-      order: index + 1,
-      sizes
+      label: item.label || itemId
     };
   });
+  const composition = readRoundCompositionEntries();
 
   const rounds = roundDefinitions.map((round) => ({
     ...round,
-    itemIds: itemNodes
-      .map((node, index) => {
-        const itemId = items[index].itemId;
-        return node.querySelector(`[data-round="${round.roundId}"]`)?.checked ? itemId : null;
-      })
-      .filter(Boolean)
+    itemIds: uniqueOrdered(composition[round.roundId] || []).filter((itemId) => seen.has(itemId))
   }));
 
   return {
@@ -1701,6 +1910,11 @@ function sanitizeRoundId(value) {
     .trim()
     .replace(/[^a-zA-Z0-9_-]/g, "_")
     .replace(/^_+|_+$/g, "") || `round_${Date.now()}`;
+}
+
+function cssEscape(value) {
+  if (window.CSS?.escape) return CSS.escape(value);
+  return String(value || "").replace(/["\\]/g, "\\$&");
 }
 
 function esc(value) {
