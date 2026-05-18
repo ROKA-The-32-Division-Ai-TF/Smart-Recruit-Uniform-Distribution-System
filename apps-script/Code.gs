@@ -5,7 +5,7 @@ const EXCHANGE_SHEET = "exchange_summary";
 const CONFIG_SHEET = "runtime_config";
 const ML_SHEET = "ml_training";
 const CONFIG_CHUNK_SIZE = 45000;
-const SCRIPT_CODE_VERSION = "2026-05-18-personal-history-v4";
+const SCRIPT_CODE_VERSION = "2026-05-18-personal-history-v5";
 
 const RAW_HEADERS = [
   "submission_id",
@@ -324,32 +324,29 @@ function resetAllData_(payload) {
 }
 
 function getPersonalRecords_(payload) {
-  ensureSheets_();
-  const cohort = String(payload.cohort || "").trim();
-  const recruitNo = String(payload.recruitNo || "").trim();
-  const personalPin = String(payload.personalPin || "").trim();
-  if (!cohort || !recruitNo || !personalPin) {
-    throw new Error("기수, 교번, 개인 PIN을 모두 입력해 주세요.");
-  }
-  if (!/^[0-9]{4}$/.test(personalPin)) {
-    throw new Error("개인 PIN은 숫자 4자리로 입력해 주세요.");
-  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    ensureSheets_();
+    const cohort = String(payload.cohort || "").trim();
+    const recruitNo = String(payload.recruitNo || "").trim();
+    const personalPin = String(payload.personalPin || "").trim();
+    if (!cohort || !recruitNo || !personalPin) {
+      throw new Error("기수, 교번, 개인 PIN을 모두 입력해 주세요.");
+    }
+    if (!/^[0-9]{4}$/.test(personalPin)) {
+      throw new Error("개인 PIN은 숫자 4자리로 입력해 주세요.");
+    }
 
-  const rows = readRawRecords_().filter(function(row) {
-    return String(row.cohort || "") === cohort &&
-      String(row.recruit_no || "") === recruitNo;
-  });
-  if (!rows.length) return { ok: true, records: [] };
-
-  const rowsWithPin = rows.filter(function(row) {
-    return String(row.personal_pin || "") === personalPin;
-  });
-  if (!rowsWithPin.length) {
-    const hasLegacyRows = rows.some(function(row) { return !String(row.personal_pin || ""); });
-    if (hasLegacyRows) throw new Error("개인 PIN이 설정되지 않은 기존 기록입니다. 관리자에게 문의해 주세요.");
-    throw new Error("개인 PIN이 일치하지 않습니다.");
+    const result = resolvePersonalRows_(readRawRecords_(), cohort, recruitNo, personalPin);
+    if (!result.records.length) return { ok: true, records: [] };
+    if (result.updatedCount) {
+      writeSheet_(RAW_SHEET, RAW_HEADERS, result.rows.map(function(row) { return objectToRow_(RAW_HEADERS, row); }));
+    }
+    return { ok: true, pinAttached: Boolean(result.updatedCount), records: sanitizeRawRecordsForResponse_(result.records) };
+  } finally {
+    lock.releaseLock();
   }
-  return { ok: true, records: sanitizeRawRecordsForResponse_(rowsWithPin) };
 }
 
 function updatePersonalIssueRecords_(payload) {
@@ -416,6 +413,44 @@ function attachPersonalPinToRows_(rows, matcher, personalPin) {
     return row;
   });
   return { rows: nextRows, updatedCount: updatedCount };
+}
+
+function resolvePersonalRows_(rows, cohort, recruitNo, personalPin) {
+  const personRows = rows.filter(function(row) {
+    return String(row.cohort || "") === cohort &&
+      String(row.recruit_no || "") === recruitNo;
+  });
+  if (!personRows.length) return { rows: rows, records: [], updatedCount: 0 };
+
+  const rowsWithPin = personRows.filter(function(row) {
+    return String(row.personal_pin || "") === personalPin;
+  });
+  const rowsWithoutPin = personRows.filter(function(row) {
+    return !String(row.personal_pin || "").trim();
+  });
+  const rowsWithOtherPin = personRows.filter(function(row) {
+    const pin = String(row.personal_pin || "").trim();
+    return Boolean(pin && pin !== personalPin);
+  });
+
+  if (!rowsWithPin.length && rowsWithOtherPin.length) {
+    throw new Error("개인 PIN이 일치하지 않습니다.");
+  }
+  if (!rowsWithPin.length && !rowsWithoutPin.length) {
+    throw new Error("개인 PIN이 일치하지 않습니다.");
+  }
+
+  const pinPatch = attachPersonalPinToRows_(rows, function(row) {
+    return String(row.cohort || "") === cohort &&
+      String(row.recruit_no || "") === recruitNo &&
+      !String(row.personal_pin || "").trim();
+  }, personalPin);
+  const nextRecords = pinPatch.rows.filter(function(row) {
+    return String(row.cohort || "") === cohort &&
+      String(row.recruit_no || "") === recruitNo &&
+      String(row.personal_pin || "") === personalPin;
+  });
+  return { rows: pinPatch.rows, records: nextRecords, updatedCount: pinPatch.updatedCount };
 }
 
 function assertAdmin_(adminPin) {

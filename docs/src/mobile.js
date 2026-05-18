@@ -180,8 +180,8 @@ async function loadPersonalHistory(event, sheet) {
   result.innerHTML = "";
   try {
     const response = await state.api.getPersonalRecords(payload);
-    message.textContent = "";
     renderPersonalHistoryResult(sheet, payload, response.records || []);
+    message.textContent = response.pinAttached ? "개인 PIN을 기존 불출기록에 연결했습니다." : "";
   } catch (error) {
     message.textContent = error.message || "불출기록을 확인하지 못했습니다.";
   }
@@ -644,7 +644,7 @@ function renderReview(message = "") {
           .join("")}
       </div>
       <div class="review-actions">
-        <button id="downloadDraftReceipt" class="secondary-button" type="button">현재 내역 이미지 저장</button>
+        <button id="downloadDraftReceipt" class="secondary-button receipt-save-button" type="button">현재 내역 이미지 저장</button>
         <button id="submitIssue" class="primary-button" type="button">최종 확정</button>
       </div>
       <p id="submitMessage" class="form-message">${esc(message)}</p>
@@ -815,8 +815,10 @@ function renderDone(title, rows) {
           )
           .join("")}
       </div>
-      <button id="downloadReceipt" class="primary-button" type="button">불출 내역 이미지 저장</button>
-      <button id="startOver" class="ghost-button" type="button">처음으로</button>
+      <div class="done-actions">
+        <button id="downloadReceipt" class="primary-button receipt-save-button" type="button">불출 내역 이미지 저장</button>
+        <button id="startOver" class="ghost-button" type="button">처음으로</button>
+      </div>
     </section>
   `;
 

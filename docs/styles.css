@@ -1183,8 +1183,38 @@ button:disabled {
 
 .review-actions {
   display: grid;
-  gap: 16px;
-  margin: 24px 0 8px;
+  gap: 12px;
+  margin: 26px 0 10px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+}
+
+.review-actions .primary-button,
+.review-actions .secondary-button,
+.done-actions .primary-button,
+.done-actions .ghost-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.review-actions .receipt-save-button,
+.done-actions .receipt-save-button {
+  min-height: 52px;
+  border-radius: 18px;
+  font-size: 1.08rem;
+}
+
+.done-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+}
+
+.done-actions .ghost-button {
+  min-height: 52px;
+  border-radius: 18px;
+  font-size: 1.05rem;
 }
 
 .receipt-card h2 {

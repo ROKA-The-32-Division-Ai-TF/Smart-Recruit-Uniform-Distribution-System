@@ -270,9 +270,13 @@ function mockGetPersonalRecords(config, payload) {
   );
   if (!rows.length) return { ok: true, records: [] };
 
-  const authorizedRows = rows.filter((row) => String(row.personal_pin || "") === personalPin);
-  if (!authorizedRows.length) throw new Error("개인 PIN이 일치하지 않습니다.");
-  return { ok: true, records: stripPersonalPins(authorizedRows) };
+  const resolved = resolveMockPersonalRows(readRecords(config), cohort, recruitNo, personalPin);
+  if (resolved.updatedCount) writeRecords(resolved.records);
+  return { ok: true, pinAttached: Boolean(resolved.updatedCount), records: stripPersonalPins(resolved.records.filter((row) =>
+    String(row.cohort || "") === cohort &&
+    String(row.recruit_no || "") === recruitNo &&
+    String(row.personal_pin || "") === personalPin
+  )) };
 }
 
 function mockUpdatePersonalIssueRecords(config, payload) {
@@ -515,6 +519,26 @@ function isEditedSizeChanged(row, finalSize) {
   if (hasRecommendation) return Boolean(nextFinalSize && nextFinalSize !== recommendedSize);
   if (nextFinalSize !== previousFinalSize) return Boolean(nextFinalSize);
   return row.changed === "Y" || row.changed === true;
+}
+
+function resolveMockPersonalRows(records, cohort, recruitNo, personalPin) {
+  const personRows = records.filter((row) =>
+    String(row.cohort || "") === cohort &&
+    String(row.recruit_no || "") === recruitNo
+  );
+  const rowsWithPin = personRows.filter((row) => String(row.personal_pin || "") === personalPin);
+  const rowsWithoutPin = personRows.filter((row) => !String(row.personal_pin || "").trim());
+  const rowsWithOtherPin = personRows.filter((row) => {
+    const pin = String(row.personal_pin || "").trim();
+    return Boolean(pin && pin !== personalPin);
+  });
+  if (!rowsWithPin.length && rowsWithOtherPin.length) throw new Error("개인 PIN이 일치하지 않습니다.");
+  if (!rowsWithPin.length && !rowsWithoutPin.length) throw new Error("개인 PIN이 일치하지 않습니다.");
+  const patched = attachPersonalPin(records, (row) =>
+    String(row.cohort || "") === cohort &&
+    String(row.recruit_no || "") === recruitNo &&
+    !String(row.personal_pin || "").trim(), personalPin);
+  return patched;
 }
 
 function savePending(payload) {
