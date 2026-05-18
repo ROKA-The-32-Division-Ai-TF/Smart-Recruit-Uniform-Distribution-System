@@ -5,7 +5,7 @@ const EXCHANGE_SHEET = "exchange_summary";
 const CONFIG_SHEET = "runtime_config";
 const ML_SHEET = "ml_training";
 const CONFIG_CHUNK_SIZE = 45000;
-const SCRIPT_CODE_VERSION = "2026-05-18-personal-history-v3";
+const SCRIPT_CODE_VERSION = "2026-05-18-personal-history-v4";
 
 const RAW_HEADERS = [
   "submission_id",
@@ -45,6 +45,18 @@ const ML_HEADERS = [
   "dis_bucket",
   "config_version"
 ];
+
+function json_(value, callback) {
+  const text = JSON.stringify(value);
+  if (callback) {
+    return ContentService
+      .createTextOutput(String(callback) + "(" + text + ");")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService
+    .createTextOutput(text)
+    .setMimeType(ContentService.MimeType.JSON);
+}
 
 function doPost(e) {
   try {
@@ -908,16 +920,4 @@ function summarySorter_(a, b) {
 function calcBmi_(height, weight) {
   const meters = Math.max(Number(height) / 100, 0.1);
   return Math.round((Number(weight) / (meters * meters)) * 10) / 10;
-}
-
-function json_(value, callback) {
-  const text = JSON.stringify(value);
-  if (callback) {
-    return ContentService
-      .createTextOutput(String(callback) + "(" + text + ");")
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-  return ContentService
-    .createTextOutput(text)
-    .setMimeType(ContentService.MimeType.JSON);
 }
