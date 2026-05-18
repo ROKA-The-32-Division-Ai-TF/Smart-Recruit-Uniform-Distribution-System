@@ -61,6 +61,14 @@ export function createApi(config) {
       if (useLocalMock) return mockResetAllData();
       return postAppsScript(appsScriptUrl, "resetAllData", { adminPin });
     },
+    async updateIssueRecords(adminPin, payload) {
+      if (useLocalMock) return mockUpdateIssueRecords(config, payload);
+      return postAppsScript(appsScriptUrl, "updateIssueRecords", { adminPin, ...payload });
+    },
+    async deleteIssueRecords(adminPin, payload) {
+      if (useLocalMock) return mockDeleteIssueRecords(config, payload);
+      return postAppsScript(appsScriptUrl, "deleteIssueRecords", { adminPin, ...payload });
+    },
     listPending() {
       return readJson(PENDING_KEY, []);
     },
@@ -208,6 +216,48 @@ function mockResetAllData() {
   writeJson("sruds_learning_v1", []);
   writeJson(PENDING_KEY, []);
   return { ok: true, message: "전체 초기화가 완료되었습니다." };
+}
+
+function mockUpdateIssueRecords(config, payload) {
+  const records = readRecords(config);
+  const itemUpdates = new Map((payload.items || []).map((item) => [String(item.itemId), String(item.finalSize || "")]));
+  let updatedCount = 0;
+  const nextRecords = records.map((row) => {
+    const match = String(row.cohort || "") === String(payload.cohort || "") &&
+      String(row.recruit_no || "") === String(payload.recruitNo || "") &&
+      String(row.round_id || "") === String(payload.roundId || "") &&
+      itemUpdates.has(String(row.item_id || ""));
+    if (!match) return row;
+    const finalSize = itemUpdates.get(String(row.item_id || ""));
+    const changed = finalSize && String(finalSize) !== String(row.recommended_size || "");
+    updatedCount += 1;
+    return {
+      ...row,
+      final_size: finalSize,
+      changed: changed ? "Y" : "N",
+      change_reason: changed ? "관리자 수정" : ""
+    };
+  });
+  if (!updatedCount) throw new Error("수정할 불출 기록을 찾지 못했습니다.");
+  writeRecords(nextRecords);
+  return { ok: true, updatedCount, message: "불출 내역을 수정했습니다." };
+}
+
+function mockDeleteIssueRecords(config, payload) {
+  const records = readRecords(config);
+  const nextRecords = records.filter((row) => !(
+    String(row.cohort || "") === String(payload.cohort || "") &&
+    String(row.recruit_no || "") === String(payload.recruitNo || "") &&
+    String(row.round_id || "") === String(payload.roundId || "")
+  ));
+  const deletedCount = records.length - nextRecords.length;
+  if (!deletedCount) throw new Error("삭제할 불출 기록을 찾지 못했습니다.");
+  writeRecords(nextRecords);
+  return {
+    ok: true,
+    deletedCount,
+    message: "불출 내역을 삭제했습니다."
+  };
 }
 
 function buildSummary(config, records) {

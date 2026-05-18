@@ -312,6 +312,7 @@ function renderItem() {
   app.innerHTML = `
     <section class="item-screen">
       ${renderSlimBrand()}
+      <button id="closeDetail" class="detail-close-button" type="button" aria-label="추천표로 돌아가기">×</button>
       <div class="item-progress">
         <button id="backToSummary" class="detail-back" type="button">추천표</button>
         <span>${esc(state.round.label)}</span>
@@ -319,7 +320,7 @@ function renderItem() {
       </div>
       <h1>${esc(item.label)}</h1>
       ${renderItemVisual(item)}
-      <div class="recommend-copy">${direct ? "사이즈를 직접 선택해 주세요." : "백룡AI가 추천하는 사이즈는"}</div>
+      <div class="recommend-copy">${direct ? "사이즈를 직접 선택해 주세요." : "추천 사이즈"}</div>
       <div class="recommend-size ${item.finalSize ? "" : "empty"}">${esc(item.finalSize || (direct ? "미선택" : "선택"))}</div>
       ${renderDetailSizeStack(item)}
       <p class="algorithm-note">${direct ? "AI 추천 없이 본인 실측 또는 착용 기준으로 선택합니다." : `${esc(recommendation.targetDescription)} · BMI ${recommendation.bmi} (${esc(recommendation.bmiLabel)})`}</p>
@@ -333,6 +334,7 @@ function renderItem() {
     </section>
   `;
 
+  document.querySelector("#closeDetail").addEventListener("click", () => renderInput("추천 사이즈표로 돌아왔습니다."));
   document.querySelector("#backToSummary").addEventListener("click", () => renderInput("추천 사이즈표로 돌아왔습니다."));
   document.querySelector("#changeSize")?.addEventListener("click", () => openSizeSheet(item, "detail"));
   document.querySelectorAll("[data-detail-size]").forEach((button) => {
@@ -416,6 +418,7 @@ function renderReview(message = "") {
       ${renderSlimBrand()}
       <div class="section-kicker">${esc(state.round.label)}</div>
       <h1>최종 확정</h1>
+      <p class="review-warning">최종 확정 전 사이즈를 한 번 더 확인해 주세요. 확정 후 교체나 수정은 관리자 확인이 필요합니다.</p>
       <div class="review-list">
         ${state.issueItems
           .map(
@@ -430,6 +433,7 @@ function renderReview(message = "") {
           .join("")}
       </div>
       <div class="review-actions">
+        <button id="downloadDraftReceipt" class="secondary-button" type="button">현재 내역 이미지 저장</button>
         <button id="submitIssue" class="primary-button" type="button">최종 확정</button>
       </div>
       <p id="submitMessage" class="form-message">${esc(message)}</p>
@@ -437,6 +441,7 @@ function renderReview(message = "") {
   `;
 
   document.querySelector("#submitIssue").addEventListener("click", openSubmitConfirm);
+  document.querySelector("#downloadDraftReceipt").addEventListener("click", () => downloadReceiptImage(buildCurrentReceiptRows()));
   document.querySelectorAll(".review-row").forEach((row) => {
     row.addEventListener("click", () => {
       state.itemIndex = Number(row.dataset.reviewIndex || 0);
@@ -459,7 +464,7 @@ function openSubmitConfirm() {
   sheet.innerHTML = `
     <div class="confirm-panel" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
       <h2 id="confirmTitle">최종 확정할까요?</h2>
-        <p>확정하면 현재 선택된 사이즈가 불출 내역으로 저장됩니다.</p>
+      <p>이 버튼을 누르면 현재 선택된 사이즈가 불출 내역으로 저장됩니다. 확정 후 교체나 수정은 현장 관리자 확인이 필요하니, 사이즈 교체가 필요하면 먼저 품목 카드를 눌러 수정해 주세요.</p>
       <div class="confirm-summary">
         ${state.issueItems.map((item) => `
           <span>
@@ -483,6 +488,18 @@ function openSubmitConfirm() {
     sheet.remove();
     submitIssue();
   });
+}
+
+function buildCurrentReceiptRows() {
+  return state.issueItems.map((item) => ({
+    cohort: state.profile?.cohort || "",
+    recruit_no: state.profile?.recruitNo || "",
+    round_name: state.round?.label || "",
+    item_name: item.label,
+    recommended_size: item.recommendation?.recommendedSize || "",
+    final_size: item.finalSize || "",
+    changed: !isDirectSelectionItem(item) && item.finalSize !== item.recommendation?.recommendedSize ? "Y" : "N"
+  }));
 }
 
 async function submitIssue() {

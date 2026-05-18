@@ -5,7 +5,7 @@ const EXCHANGE_SHEET = "exchange_summary";
 const CONFIG_SHEET = "runtime_config";
 const ML_SHEET = "ml_training";
 const CONFIG_CHUNK_SIZE = 45000;
-const SCRIPT_CODE_VERSION = "2026-05-17-admin-settings-cohort-v2";
+const SCRIPT_CODE_VERSION = "2026-05-18-feedback-edit-delete-v1";
 
 const RAW_HEADERS = [
   "submission_id",
@@ -76,6 +76,12 @@ function doPost(e) {
     }
     if (action === "resetAllData") {
       return json_(resetAllData_(payload));
+    }
+    if (action === "updateIssueRecords") {
+      return json_(updateIssueRecords_(payload));
+    }
+    if (action === "deleteIssueRecords") {
+      return json_(deleteIssueRecords_(payload));
     }
 
     return json_({ ok: false, message: "알 수 없는 action입니다." });
@@ -490,6 +496,80 @@ function buildSummary_(records) {
   };
 }
 
+function updateIssueRecords_(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    assertAdmin_(payload.adminPin);
+    ensureSheets_();
+
+    const cohort = String(payload.cohort || "").trim();
+    const recruitNo = String(payload.recruitNo || "").trim();
+    const roundId = String(payload.roundId || "").trim();
+    const itemUpdates = {};
+    (payload.items || []).forEach(function(item) {
+      const itemId = String(item.itemId || "").trim();
+      if (itemId) itemUpdates[itemId] = String(item.finalSize || "").trim();
+    });
+    if (!cohort || !recruitNo || !roundId) throw new Error("수정할 기수, 교번, 차수 정보가 필요합니다.");
+    if (!Object.keys(itemUpdates).length) throw new Error("수정할 품목이 없습니다.");
+
+    var updatedCount = 0;
+    const rows = readRawRecords_().map(function(row) {
+      const itemId = String(row.item_id || "");
+      const match = String(row.cohort || "") === cohort &&
+        String(row.recruit_no || "") === recruitNo &&
+        String(row.round_id || "") === roundId &&
+        Object.prototype.hasOwnProperty.call(itemUpdates, itemId);
+      if (!match) return row;
+
+      const finalSize = itemUpdates[itemId];
+      const changed = finalSize && String(finalSize) !== String(row.recommended_size || "");
+      row.final_size = finalSize;
+      row.changed = changed ? "Y" : "N";
+      row.change_reason = changed ? "관리자 수정" : "";
+      updatedCount += 1;
+      return row;
+    });
+
+    if (!updatedCount) throw new Error("수정할 불출 기록을 찾지 못했습니다.");
+    writeSheet_(RAW_SHEET, RAW_HEADERS, rows.map(function(row) { return objectToRow_(RAW_HEADERS, row); }));
+    refreshSummaries_();
+    return { ok: true, updatedCount: updatedCount, message: "불출 내역을 수정했습니다." };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteIssueRecords_(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    assertAdmin_(payload.adminPin);
+    ensureSheets_();
+
+    const cohort = String(payload.cohort || "").trim();
+    const recruitNo = String(payload.recruitNo || "").trim();
+    const roundId = String(payload.roundId || "").trim();
+    if (!cohort || !recruitNo || !roundId) throw new Error("삭제할 기수, 교번, 차수 정보가 필요합니다.");
+
+    const rows = readRawRecords_();
+    const remainingRows = rows.filter(function(row) {
+      return !(String(row.cohort || "") === cohort &&
+        String(row.recruit_no || "") === recruitNo &&
+        String(row.round_id || "") === roundId);
+    });
+    const deletedCount = rows.length - remainingRows.length;
+
+    if (!deletedCount) throw new Error("삭제할 불출 기록을 찾지 못했습니다.");
+    writeSheet_(RAW_SHEET, RAW_HEADERS, remainingRows.map(function(row) { return objectToRow_(RAW_HEADERS, row); }));
+    refreshSummaries_();
+    return { ok: true, deletedCount: deletedCount, message: "불출 내역을 삭제했습니다." };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function ensureSheets_() {
   const rawSheet = getOrCreateSheet_(RAW_SHEET);
   ensureHeader_(rawSheet, RAW_HEADERS);
@@ -652,6 +732,12 @@ function rowToObject_(headers, row) {
     out[header] = row[index];
   });
   return out;
+}
+
+function objectToRow_(headers, object) {
+  return headers.map(function(header) {
+    return object[header] === undefined ? "" : object[header];
+  });
 }
 
 function unique_(values) {

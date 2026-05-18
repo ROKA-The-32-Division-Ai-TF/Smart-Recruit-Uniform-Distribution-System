@@ -43,7 +43,7 @@ button:disabled {
   min-height: 100vh;
   min-height: 100svh;
   min-height: 100dvh;
-  background: var(--gradient);
+  background: #ffffff;
 }
 
 .app-shell {
@@ -118,7 +118,7 @@ button:disabled {
   gap: 18px;
   align-content: start;
   padding: max(32px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom));
-  background: var(--gradient);
+  background: #ffffff;
   transition: background 420ms ease;
 }
 
@@ -763,6 +763,7 @@ button:disabled {
 .item-screen,
 .review-screen,
 .done-screen {
+  position: relative;
   min-height: 100vh;
   min-height: 100svh;
   min-height: 100dvh;
@@ -770,6 +771,23 @@ button:disabled {
   margin: 0 auto;
   padding: max(24px, env(safe-area-inset-top)) 28px max(24px, env(safe-area-inset-bottom));
   background: #ffffff;
+}
+
+.detail-close-button {
+  position: fixed;
+  top: max(18px, env(safe-area-inset-top));
+  right: 18px;
+  z-index: 8;
+  width: 46px;
+  height: 46px;
+  border: 2px solid #d8e2f5;
+  border-radius: 50%;
+  color: var(--blue);
+  background: #ffffff;
+  font-size: 1.8rem;
+  font-weight: 950;
+  line-height: 1;
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.12);
 }
 
 .slim-brand {
@@ -875,7 +893,7 @@ button:disabled {
 .recommend-copy {
   color: var(--blue);
   text-align: center;
-  font-size: 1.45rem;
+  font-size: 1.6rem;
   font-weight: 900;
 }
 
@@ -942,7 +960,7 @@ button:disabled {
 
 .detail-size-option span {
   grid-area: label;
-  color: #7a8395;
+  color: #4b5563;
   font-weight: 950;
 }
 
@@ -957,8 +975,8 @@ button:disabled {
 
 .detail-size-option small {
   grid-area: meta;
-  color: #7c8495;
-  font-size: 0.86rem;
+  color: #4b5563;
+  font-size: 0.95rem;
   font-weight: 850;
 }
 
@@ -1039,6 +1057,18 @@ button:disabled {
   display: grid;
   gap: 12px;
   margin: 20px 0;
+}
+
+.review-warning {
+  margin: 0 auto 16px;
+  padding: 14px 16px;
+  border: 2px solid #f59e0b;
+  border-radius: 16px;
+  color: #713f12;
+  background: #fffbeb;
+  font-size: 1.08rem;
+  font-weight: 900;
+  line-height: 1.45;
 }
 
 .review-row,
@@ -1448,9 +1478,58 @@ button:disabled {
   padding-bottom: 6px;
 }
 
-.mobile-table-wrap {
+.mobile-table-wrap,
+.mobile-item-accordion {
   padding: 0 14px 16px;
   overflow: auto;
+}
+
+.mobile-item-accordion {
+  display: grid;
+  gap: 10px;
+}
+
+.mobile-item-group {
+  border: 1px solid #dce6fb;
+  border-radius: 16px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.mobile-item-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 58px;
+  padding: 0 14px;
+  color: var(--blue-dark);
+  list-style: none;
+  font-weight: 950;
+}
+
+.mobile-item-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.mobile-item-group summary::after {
+  content: "열기";
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--blue);
+  background: #eef4ff;
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.mobile-item-group[open] summary::after {
+  content: "접기";
+}
+
+.mobile-item-group summary span {
+  color: var(--blue);
+  font-weight: 950;
 }
 
 .mobile-report-table {
@@ -3376,6 +3455,140 @@ button:disabled {
   font-weight: 950;
   box-shadow: 0 14px 28px rgba(220, 38, 38, 0.18);
   white-space: nowrap;
+}
+
+.table-action-button {
+  min-height: 34px;
+  border: 1px solid #c9d8f5;
+  border-radius: 999px;
+  padding: 0 12px;
+  color: var(--blue);
+  background: #eef5ff;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.admin-edit-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.44);
+}
+
+.admin-edit-panel {
+  width: min(760px, 100%);
+  max-height: min(820px, 92vh);
+  overflow: auto;
+  border-radius: 24px;
+  padding: 22px;
+  background: #ffffff;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
+}
+
+.admin-edit-panel header,
+.issue-edit-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-edit-panel header h2 {
+  margin: 0 0 4px;
+  color: var(--blue-dark);
+  font-size: 1.35rem;
+}
+
+.admin-edit-panel header p,
+.issue-edit-warning {
+  margin: 0;
+  color: #64748b;
+  font-weight: 850;
+}
+
+.admin-edit-panel header button {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--blue);
+  background: #eef4ff;
+  font-size: 1.4rem;
+  font-weight: 950;
+}
+
+.issue-edit-list {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.issue-edit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #dce6fb;
+  border-radius: 16px;
+  padding: 12px;
+  background: #f8fbff;
+}
+
+.issue-edit-row span,
+.issue-edit-row small {
+  display: block;
+}
+
+.issue-edit-row strong {
+  color: #172554;
+  font-weight: 950;
+}
+
+.issue-edit-row small {
+  margin-top: 3px;
+  color: #64748b;
+  font-weight: 850;
+}
+
+@media (max-width: 760px) {
+  .admin-edit-sheet {
+    padding: 14px;
+  }
+
+  .admin-edit-panel {
+    max-height: 94vh;
+    border-radius: 20px;
+    padding: 18px;
+  }
+
+  .issue-edit-row,
+  .issue-edit-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .issue-edit-actions span {
+    display: none;
+  }
+}
+
+.issue-edit-row select {
+  min-height: 46px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 0 12px;
+  color: var(--blue-dark);
+  background: #ffffff;
+  font-weight: 950;
+}
+
+.issue-edit-actions {
+  grid-template-columns: auto 1fr auto auto;
+  margin-top: 18px;
 }
 
 .issue-date-rounds span,

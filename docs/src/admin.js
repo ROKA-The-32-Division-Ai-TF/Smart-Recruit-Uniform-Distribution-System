@@ -567,6 +567,15 @@ function bindIssueControls() {
       printIssueReport(button.dataset.printReport || "size");
     });
   });
+  bindIssueEditButtons();
+}
+
+function bindIssueEditButtons() {
+  document.querySelectorAll("[data-edit-issue]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openIssueEditDialog(button.dataset.cohort || "", button.dataset.recruitNo || "", button.dataset.roundId || "");
+    });
+  });
 }
 
 function bindPinEditor() {
@@ -829,36 +838,54 @@ function filterRecordsByItem(records, itemId) {
 }
 
 function renderMobileItemTable(summary) {
+  const groups = groupMobileItems(summary.sizeSummary || []);
   return `
     <section class="admin-section mobile-report-section">
       <div class="section-head">
         <h2>품목별 불출 수량</h2>
       </div>
-      <div class="mobile-table-wrap">
-        <table class="mobile-report-table">
-          <thead>
-            <tr>
-              <th>품목</th>
-              <th>사이즈</th>
-              <th>수량</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${summary.sizeSummary.map((row) => `
-              <tr>
-                <td>
-                  <strong>${esc(row.itemName)}</strong>
-                  <span>${esc(row.roundName)}</span>
-                </td>
-                <td>${esc(row.size)}</td>
-                <td>${Number(row.count || 0).toLocaleString("ko-KR")}개</td>
-              </tr>
-            `).join("") || `<tr><td colspan="3">조회된 불출 내역이 없습니다.</td></tr>`}
-          </tbody>
-        </table>
+      <div class="mobile-item-accordion">
+        ${groups.map((group) => `
+          <details class="mobile-item-group">
+            <summary>
+              <strong>${esc(group.itemName)}</strong>
+              <span>${group.total.toLocaleString("ko-KR")}개</span>
+            </summary>
+            <table class="mobile-report-table">
+              <thead>
+                <tr>
+                  <th>차수</th>
+                  <th>사이즈</th>
+                  <th>수량</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${group.rows.map((row) => `
+                  <tr>
+                    <td>${esc(row.roundName)}</td>
+                    <td>${esc(row.size)}</td>
+                    <td>${Number(row.count || 0).toLocaleString("ko-KR")}개</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </details>
+        `).join("") || `<p class="mobile-empty-state">조회된 불출 내역이 없습니다.</p>`}
       </div>
     </section>
   `;
+}
+
+function groupMobileItems(rows) {
+  const byItem = new Map();
+  rows.forEach((row) => {
+    const key = row.itemId || row.itemName;
+    const group = byItem.get(key) || { itemName: row.itemName || key, total: 0, rows: [] };
+    group.total += Number(row.count || 0);
+    group.rows.push(row);
+    byItem.set(key, group);
+  });
+  return [...byItem.values()].sort((a, b) => String(a.itemName).localeCompare(String(b.itemName), "ko"));
 }
 
 function renderMobilePersonSearch(summary) {
@@ -1145,6 +1172,7 @@ function renderPersonPanel(summary) {
               ${renderExcelFilterHeader("recruitNo", "교번", summary.personSummary, "person")}
               ${renderExcelFilterHeader("roundName", "차수", summary.personSummary, "person")}
               ${summary.personColumns.map((column) => renderExcelFilterHeader(`item:${column}`, column, summary.personSummary, "person")).join("")}
+              <th>관리</th>
             </tr>
           </thead>
           <tbody id="personTableBody">
@@ -1381,6 +1409,7 @@ function applyColumnFilter(filter) {
     visiblePersonSummary = filterPersonRows(currentIssuePersonRows);
     document.querySelector("#personTableBody").innerHTML = renderPersonRows(visiblePersonSummary, currentIssueSummary?.personColumns || []);
     document.querySelector("#personFilterCount").textContent = `${visiblePersonSummary.length.toLocaleString("ko-KR")}개 항목 표시`;
+    bindIssueEditButtons();
   } else {
     visibleSizeSummary = filterSizeRows(currentIssueSizeRows);
     document.querySelector("#sizeTableBody").innerHTML = renderSizeRows(visibleSizeSummary);
@@ -1448,7 +1477,7 @@ function renderSizeRow(row) {
 }
 
 function renderPersonRows(rows, columns) {
-  return rows.map((row) => renderPersonRow(row, columns)).join("") || `<tr><td colspan="${columns.length + 3}">조건에 맞는 개인 불출 내역이 없습니다.</td></tr>`;
+  return rows.map((row) => renderPersonRow(row, columns)).join("") || `<tr><td colspan="${columns.length + 4}">조건에 맞는 개인 불출 내역이 없습니다.</td></tr>`;
 }
 
 function renderPersonRow(row, columns) {
@@ -1458,8 +1487,115 @@ function renderPersonRow(row, columns) {
       <td><strong>${esc(row.recruitNo)}</strong></td>
       <td>${esc(row.roundName)}</td>
       ${columns.map((column) => `<td>${esc(row.items[column] || "-")}</td>`).join("")}
+      <td>
+        <button class="table-action-button" data-edit-issue data-cohort="${esc(row.cohort || "")}" data-recruit-no="${esc(row.recruitNo || "")}" data-round-id="${esc(row.roundId || "")}" type="button">수정</button>
+      </td>
     </tr>
   `;
+}
+
+function openIssueEditDialog(cohort, recruitNo, roundId) {
+  document.querySelector(".admin-edit-sheet")?.remove();
+  const rows = findIssueRows(cohort, recruitNo, roundId);
+  if (!rows.length) {
+    alert("수정할 불출 내역을 찾지 못했습니다.");
+    return;
+  }
+  const sheet = document.createElement("div");
+  sheet.className = "admin-edit-sheet";
+  sheet.innerHTML = `
+    <section class="admin-edit-panel" role="dialog" aria-modal="true" aria-labelledby="issueEditTitle">
+      <header>
+        <div>
+          <h2 id="issueEditTitle">개인별 불출 내역 수정</h2>
+          <p>${esc(cohort || "-")} · 교번 ${esc(recruitNo)} · ${esc(rows[0].round_name || roundId)}</p>
+        </div>
+        <button data-close-edit type="button" aria-label="닫기">×</button>
+      </header>
+      <div class="issue-edit-list">
+        ${rows.map((row) => renderIssueEditRow(row)).join("")}
+      </div>
+      <p class="issue-edit-warning">수정 또는 삭제하면 Google Sheets 원본 기록과 관리자 집계가 함께 갱신됩니다. 학습용 누적 데이터는 보존됩니다.</p>
+      <div class="issue-edit-actions">
+        <button class="danger-button" data-delete-issue type="button">이 차수 기록 삭제</button>
+        <span></span>
+        <button class="ghost-button" data-close-edit type="button">취소</button>
+        <button class="primary-button" data-save-issue type="button">수정 저장</button>
+      </div>
+      <p class="form-message" data-edit-message></p>
+    </section>
+  `;
+  document.body.appendChild(sheet);
+  sheet.querySelectorAll("[data-close-edit]").forEach((button) => button.addEventListener("click", () => sheet.remove()));
+  sheet.addEventListener("click", (event) => {
+    if (event.target === sheet) sheet.remove();
+  });
+  sheet.querySelector("[data-save-issue]").addEventListener("click", () => saveIssueEdit(sheet, cohort, recruitNo, roundId));
+  sheet.querySelector("[data-delete-issue]").addEventListener("click", () => deleteIssueRecordGroup(sheet, cohort, recruitNo, roundId));
+}
+
+function findIssueRows(cohort, recruitNo, roundId) {
+  const order = new Map((config.items || []).map((item, index) => [item.itemId, index]));
+  return (currentSummary?.records || [])
+    .filter((row) =>
+      String(row.cohort || "") === String(cohort || "") &&
+      String(row.recruit_no || "") === String(recruitNo || "") &&
+      String(row.round_id || "") === String(roundId || "")
+    )
+    .sort((a, b) => (order.get(a.item_id) ?? 999) - (order.get(b.item_id) ?? 999) || String(a.item_name).localeCompare(String(b.item_name), "ko"));
+}
+
+function renderIssueEditRow(row) {
+  const item = (config.items || []).find((candidate) => candidate.itemId === row.item_id);
+  const sizes = uniqueValues([row.final_size, ...(item?.sizes || [])].filter(Boolean));
+  return `
+    <label class="issue-edit-row">
+      <span>
+        <strong>${esc(row.item_name)}</strong>
+        <small>추천 ${esc(row.recommended_size || "-")}</small>
+      </span>
+      <select data-edit-item-id="${esc(row.item_id)}">
+        ${sizes.map((size) => `<option value="${esc(size)}" ${String(size) === String(row.final_size) ? "selected" : ""}>${esc(size)}</option>`).join("")}
+      </select>
+    </label>
+  `;
+}
+
+async function saveIssueEdit(sheet, cohort, recruitNo, roundId) {
+  const message = sheet.querySelector("[data-edit-message]");
+  const button = sheet.querySelector("[data-save-issue]");
+  button.disabled = true;
+  message.textContent = "수정 내용을 저장하는 중입니다.";
+  try {
+    const items = [...sheet.querySelectorAll("[data-edit-item-id]")].map((select) => ({
+      itemId: select.dataset.editItemId,
+      finalSize: select.value
+    }));
+    const result = await api.updateIssueRecords(currentAdminPin, { cohort, recruitNo, roundId, items });
+    currentSummary = await api.adminSummary(currentAdminPin);
+    sheet.remove();
+    renderDashboard(currentSummary, result.message || "불출 내역을 수정했습니다.");
+  } catch (error) {
+    message.textContent = error.message || "수정에 실패했습니다.";
+    button.disabled = false;
+  }
+}
+
+async function deleteIssueRecordGroup(sheet, cohort, recruitNo, roundId) {
+  if (!confirm("정말 이 차수의 개인 불출 기록을 삭제할까요? 삭제하면 관리자 집계에서도 사라집니다.")) return;
+  const message = sheet.querySelector("[data-edit-message]");
+  const button = sheet.querySelector("[data-delete-issue]");
+  button.disabled = true;
+  message.textContent = "삭제하는 중입니다.";
+  try {
+    const result = await api.deleteIssueRecords(currentAdminPin, { cohort, recruitNo, roundId });
+    currentSummary = await api.adminSummary(currentAdminPin);
+    sheet.remove();
+    renderDashboard(currentSummary, result.message || "불출 내역을 삭제했습니다.");
+  } catch (error) {
+    message.textContent = error.message || "삭제에 실패했습니다.";
+    button.disabled = false;
+  }
 }
 
 function printIssueReport(type) {
@@ -1531,7 +1667,15 @@ function printIssueReport(type) {
 }
 
 function uniqueValues(values) {
-  return [...new Set(values.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), "ko"));
+  const seen = new Set();
+  return values
+    .map((value) => String(value || "").trim())
+    .filter((value) => {
+      if (!value || seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    })
+    .sort((a, b) => a.localeCompare(b, "ko"));
 }
 
 function uniqueOrdered(values) {
