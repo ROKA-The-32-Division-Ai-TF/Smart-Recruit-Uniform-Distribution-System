@@ -159,6 +159,16 @@ function mockSubmitIssue(config, payload) {
   const records = readRecords(config);
   const duplicate = records.some((row) => row.submission_id === payload.submissionId);
   if (duplicate) {
+    const pinPatch = attachPersonalPin(records, (row) => row.submission_id === payload.submissionId, payload.personalPin);
+    if (pinPatch.updatedCount) {
+      writeRecords(pinPatch.records);
+      return {
+        ok: true,
+        duplicate: true,
+        pinAttached: true,
+        records: stripPersonalPins(pinPatch.records.filter((row) => row.submission_id === payload.submissionId))
+      };
+    }
     return { ok: true, duplicate: true, records: stripPersonalPins(records.filter((row) => row.submission_id === payload.submissionId)) };
   }
 
@@ -168,6 +178,22 @@ function mockSubmitIssue(config, payload) {
     String(row.round_id) === String(payload.roundId)
   );
   if (duplicateRoundRows.length) {
+    const pinPatch = attachPersonalPin(records, (row) =>
+      String(row.recruit_no) === String(payload.recruitNo) &&
+      String(row.cohort || "") === String(payload.cohort || "") &&
+      String(row.round_id) === String(payload.roundId), payload.personalPin);
+    if (pinPatch.updatedCount) {
+      writeRecords(pinPatch.records);
+      return {
+        ok: true,
+        duplicate: true,
+        pinAttached: true,
+        records: stripPersonalPins(pinPatch.records.filter((row) =>
+          String(row.recruit_no) === String(payload.recruitNo) &&
+          String(row.cohort || "") === String(payload.cohort || "") &&
+          String(row.round_id) === String(payload.roundId)))
+      };
+    }
     return { ok: true, duplicate: true, records: stripPersonalPins(duplicateRoundRows) };
   }
 
@@ -274,7 +300,7 @@ function mockUpdatePersonalIssueRecords(config, payload) {
       itemUpdates.has(String(row.item_id || ""));
     if (!match) return row;
     const finalSize = itemUpdates.get(String(row.item_id || ""));
-    const changed = finalSize && String(finalSize) !== String(row.recommended_size || "");
+    const changed = isEditedSizeChanged(row, finalSize);
     updatedCount += 1;
     return {
       ...row,
@@ -299,7 +325,7 @@ function mockUpdateIssueRecords(config, payload) {
       itemUpdates.has(String(row.item_id || ""));
     if (!match) return row;
     const finalSize = itemUpdates.get(String(row.item_id || ""));
-    const changed = finalSize && String(finalSize) !== String(row.recommended_size || "");
+    const changed = isEditedSizeChanged(row, finalSize);
     updatedCount += 1;
     return {
       ...row,
@@ -465,6 +491,30 @@ function summarySorter(a, b) {
 
 function stripPersonalPins(records) {
   return records.map(({ personal_pin, ...row }) => row);
+}
+
+function attachPersonalPin(records, matcher, personalPin) {
+  const pin = String(personalPin || "").trim();
+  if (!/^\d{4}$/.test(pin)) return { records, updatedCount: 0 };
+  let updatedCount = 0;
+  const nextRecords = records.map((row) => {
+    if (matcher(row) && !String(row.personal_pin || "").trim()) {
+      updatedCount += 1;
+      return { ...row, personal_pin: pin };
+    }
+    return row;
+  });
+  return { records: nextRecords, updatedCount };
+}
+
+function isEditedSizeChanged(row, finalSize) {
+  const nextFinalSize = String(finalSize || "").trim();
+  const previousFinalSize = String(row.final_size || "").trim();
+  const recommendedSize = String(row.recommended_size || "").trim();
+  const hasRecommendation = Boolean(recommendedSize && recommendedSize !== "-");
+  if (hasRecommendation) return Boolean(nextFinalSize && nextFinalSize !== recommendedSize);
+  if (nextFinalSize !== previousFinalSize) return Boolean(nextFinalSize);
+  return row.changed === "Y" || row.changed === true;
 }
 
 function savePending(payload) {

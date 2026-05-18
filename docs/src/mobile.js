@@ -198,7 +198,7 @@ function renderPersonalHistoryResult(sheet, auth, records) {
     <article class="history-round-card">
       <header>
         <strong>${esc(group.roundName)}</strong>
-        <button data-history-edit-round="${esc(group.roundId)}" type="button">수정</button>
+        <button data-history-edit-round="${esc(group.roundId)}" type="button">사이즈 수정</button>
       </header>
       <div class="history-record-list">
         ${group.rows.map((row) => `
@@ -243,22 +243,42 @@ function renderPersonalEditForm(sheet, auth, group) {
     });
   });
   result.querySelector("[data-history-save]").addEventListener("click", () => savePersonalHistoryEdit(sheet, auth, group.roundId));
+  result.querySelectorAll("[data-history-item-id]").forEach((select) => {
+    select.addEventListener("change", () => updatePersonalEditPreview(select));
+    updatePersonalEditPreview(select);
+  });
 }
 
 function renderPersonalEditRow(row) {
   const item = state.config.items.find((candidate) => candidate.itemId === row.item_id);
   const sizes = uniqueStrings([row.final_size, ...(item?.sizes || [])]);
+  const changed = isChangedRecord(row);
   return `
-    <label class="history-edit-row">
-      <span>
+    <label class="history-edit-row ${changed ? "changed" : ""}">
+      <span class="history-edit-copy">
         <strong>${esc(row.item_name)}</strong>
         <small>추천 ${esc(row.recommended_size || "-")}</small>
+        <small>현재 ${esc(row.final_size || "-")}</small>
       </span>
-      <select data-history-item-id="${esc(row.item_id)}">
-        ${sizes.map((size) => `<option value="${esc(size)}" ${String(size) === String(row.final_size) ? "selected" : ""}>${esc(size)}</option>`).join("")}
-      </select>
+      <span class="history-edit-control">
+        <em>교체 후</em>
+        <select data-history-item-id="${esc(row.item_id)}" data-current-size="${esc(row.final_size || "")}">
+          ${sizes.map((size) => `<option value="${esc(size)}" ${String(size) === String(row.final_size) ? "selected" : ""}>${esc(size)}</option>`).join("")}
+        </select>
+        <small data-history-preview></small>
+      </span>
     </label>
   `;
+}
+
+function updatePersonalEditPreview(select) {
+  const current = select.dataset.currentSize || "-";
+  const next = select.value || "-";
+  const row = select.closest(".history-edit-row");
+  const preview = row?.querySelector("[data-history-preview]");
+  const pending = String(current) !== String(next);
+  if (preview) preview.textContent = pending ? `${current} → ${next}` : "변경 없음";
+  row?.classList.toggle("pending", pending);
 }
 
 async function savePersonalHistoryEdit(sheet, auth, roundId) {

@@ -85,7 +85,7 @@ function renderDashboard(summary, notice = "") {
   currentIssueSummary = issueSummary;
   currentIssueSizeRows = issueSummary.sizeSummary;
   currentIssuePersonRows = issueSummary.personSummary;
-  changedItemMap = buildChangedItemMap(summary.records || []);
+  changedItemMap = buildChangedItemMap(issueSummary.records || []);
   visibleSizeSummary = filterSizeRows(currentIssueSizeRows);
   visiblePersonSummary = filterPersonRows(currentIssuePersonRows);
   app.className = "admin-shell dashboard-mode";
@@ -1509,7 +1509,7 @@ function renderPersonItemCell(row, column, changedItems) {
   const value = row.items[column] || "-";
   const changed = changedItems.has(column);
   if (value === "-") {
-    return `<td class="${changed ? "changed-item-cell" : ""}">-</td>`;
+    return `<td>-</td>`;
   }
   return `
     <td class="${changed ? "changed-item-cell" : ""}">
@@ -1578,6 +1578,10 @@ function openIssueEditDialog(cohort, recruitNo, roundId) {
   });
   sheet.querySelector("[data-save-issue]").addEventListener("click", () => saveIssueEdit(sheet, cohort, recruitNo, roundId));
   sheet.querySelector("[data-delete-issue]").addEventListener("click", () => deleteIssueRecordGroup(sheet, cohort, recruitNo, roundId));
+  sheet.querySelectorAll("[data-edit-item-id]").forEach((select) => {
+    select.addEventListener("change", () => updateIssueEditPreview(select));
+    updateIssueEditPreview(select);
+  });
 }
 
 function findIssueRows(cohort, recruitNo, roundId) {
@@ -1594,17 +1598,33 @@ function findIssueRows(cohort, recruitNo, roundId) {
 function renderIssueEditRow(row) {
   const item = (config.items || []).find((candidate) => candidate.itemId === row.item_id);
   const sizes = uniqueValues([row.final_size, ...(item?.sizes || [])].filter(Boolean));
+  const changed = row.changed === "Y" || row.changed === true;
   return `
-    <label class="issue-edit-row">
-      <span>
+    <label class="issue-edit-row ${changed ? "is-changed" : ""}">
+      <span class="issue-edit-copy">
         <strong>${esc(row.item_name)}</strong>
         <small>추천 ${esc(row.recommended_size || "-")}</small>
+        <small>현재 ${esc(row.final_size || "-")}</small>
       </span>
-      <select data-edit-item-id="${esc(row.item_id)}">
-        ${sizes.map((size) => `<option value="${esc(size)}" ${String(size) === String(row.final_size) ? "selected" : ""}>${esc(size)}</option>`).join("")}
-      </select>
+      <span class="issue-edit-control">
+        <em>교체 후</em>
+        <select data-edit-item-id="${esc(row.item_id)}" data-current-size="${esc(row.final_size || "")}" data-recommended-size="${esc(row.recommended_size || "")}">
+          ${sizes.map((size) => `<option value="${esc(size)}" ${String(size) === String(row.final_size) ? "selected" : ""}>${esc(size)}</option>`).join("")}
+        </select>
+        <small data-edit-preview></small>
+      </span>
     </label>
   `;
+}
+
+function updateIssueEditPreview(select) {
+  const current = select.dataset.currentSize || "-";
+  const next = select.value || "-";
+  const preview = select.closest(".issue-edit-row")?.querySelector("[data-edit-preview]");
+  const row = select.closest(".issue-edit-row");
+  const pending = String(current) !== String(next);
+  if (preview) preview.textContent = pending ? `${current} → ${next}` : "변경 없음";
+  row?.classList.toggle("is-pending-change", pending);
 }
 
 async function saveIssueEdit(sheet, cohort, recruitNo, roundId) {

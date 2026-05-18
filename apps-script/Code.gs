@@ -5,7 +5,7 @@ const EXCHANGE_SHEET = "exchange_summary";
 const CONFIG_SHEET = "runtime_config";
 const ML_SHEET = "ml_training";
 const CONFIG_CHUNK_SIZE = 45000;
-const SCRIPT_CODE_VERSION = "2026-05-18-personal-history-v2";
+const SCRIPT_CODE_VERSION = "2026-05-18-personal-history-v3";
 
 const RAW_HEADERS = [
   "submission_id",
@@ -186,6 +186,16 @@ function submitIssue_(payload) {
       return String(row.submission_id) === String(payload.submissionId);
     });
     if (duplicateRows.length) {
+      const pinPatch = attachPersonalPinToRows_(existingRows, function(row) {
+        return String(row.submission_id) === String(payload.submissionId);
+      }, payload.personalPin);
+      if (pinPatch.updatedCount) {
+        writeSheet_(RAW_SHEET, RAW_HEADERS, pinPatch.rows.map(function(row) { return objectToRow_(RAW_HEADERS, row); }));
+        const patchedRows = pinPatch.rows.filter(function(row) {
+          return String(row.submission_id) === String(payload.submissionId);
+        });
+        return { ok: true, duplicate: true, pinAttached: true, records: sanitizeRawRecordsForResponse_(patchedRows) };
+      }
       return { ok: true, duplicate: true, records: sanitizeRawRecordsForResponse_(duplicateRows) };
     }
 
@@ -195,6 +205,20 @@ function submitIssue_(payload) {
         String(row.round_id) === String(payload.roundId);
     });
     if (existingRoundRows.length) {
+      const pinPatch = attachPersonalPinToRows_(existingRows, function(row) {
+        return String(row.recruit_no) === String(payload.recruitNo) &&
+          String(row.cohort || "") === String(payload.cohort || "") &&
+          String(row.round_id) === String(payload.roundId);
+      }, payload.personalPin);
+      if (pinPatch.updatedCount) {
+        writeSheet_(RAW_SHEET, RAW_HEADERS, pinPatch.rows.map(function(row) { return objectToRow_(RAW_HEADERS, row); }));
+        const patchedRows = pinPatch.rows.filter(function(row) {
+          return String(row.recruit_no) === String(payload.recruitNo) &&
+            String(row.cohort || "") === String(payload.cohort || "") &&
+            String(row.round_id) === String(payload.roundId);
+        });
+        return { ok: true, duplicate: true, pinAttached: true, records: sanitizeRawRecordsForResponse_(patchedRows) };
+      }
       return { ok: true, duplicate: true, records: sanitizeRawRecordsForResponse_(existingRoundRows) };
     }
 
@@ -366,6 +390,20 @@ function sanitizeRawRecordForResponse_(row) {
   const safeRow = Object.assign({}, row);
   delete safeRow.personal_pin;
   return safeRow;
+}
+
+function attachPersonalPinToRows_(rows, matcher, personalPin) {
+  const pin = String(personalPin || "").trim();
+  if (!/^[0-9]{4}$/.test(pin)) return { rows: rows, updatedCount: 0 };
+  var updatedCount = 0;
+  const nextRows = rows.map(function(row) {
+    if (matcher(row) && !String(row.personal_pin || "").trim()) {
+      row.personal_pin = pin;
+      updatedCount += 1;
+    }
+    return row;
+  });
+  return { rows: nextRows, updatedCount: updatedCount };
 }
 
 function assertAdmin_(adminPin) {
@@ -634,7 +672,7 @@ function updateIssueRows_(rows, options) {
     if (!baseMatch || !pinMatch) return row;
 
     const finalSize = itemUpdates[itemId];
-    const changed = finalSize && String(finalSize) !== String(row.recommended_size || "");
+    const changed = isEditedSizeChanged_(row, finalSize);
     row.final_size = finalSize;
     row.changed = changed ? "Y" : "N";
     row.change_reason = changed ? String(options.changeReason || "수정") : "";
@@ -644,6 +682,16 @@ function updateIssueRows_(rows, options) {
 
   if (!updatedCount) throw new Error("수정할 불출 기록을 찾지 못했습니다.");
   return { rows: nextRows, updatedCount: updatedCount };
+}
+
+function isEditedSizeChanged_(row, finalSize) {
+  const nextFinalSize = String(finalSize || "").trim();
+  const previousFinalSize = String(row.final_size || "").trim();
+  const recommendedSize = String(row.recommended_size || "").trim();
+  const hasRecommendation = Boolean(recommendedSize && recommendedSize !== "-");
+  if (hasRecommendation) return Boolean(nextFinalSize && nextFinalSize !== recommendedSize);
+  if (nextFinalSize !== previousFinalSize) return Boolean(nextFinalSize);
+  return row.changed === "Y" || row.changed === true;
 }
 
 function deleteIssueRecords_(payload) {

@@ -365,6 +365,8 @@ button:disabled {
   border: 0;
   border-radius: 24px;
   font-weight: 900;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 180ms ease, background 180ms ease, border-color 180ms ease;
 }
 
 .primary-button {
@@ -377,6 +379,15 @@ button:disabled {
 
 .primary-button:active {
   transform: translateY(1px);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled,
+.ghost-button:disabled,
+.danger-button:disabled,
+.table-action-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 .secondary-button {
@@ -1299,6 +1310,14 @@ button:disabled {
   font: inherit;
   font-weight: 950;
   white-space: nowrap;
+  cursor: pointer;
+  transition: transform 160ms ease, background 180ms ease;
+}
+
+.history-round-card header button {
+  color: #ffffff;
+  background: var(--accent);
+  box-shadow: 0 10px 20px rgba(41, 79, 174, 0.14);
 }
 
 .history-panel [data-history-close] {
@@ -1402,6 +1421,30 @@ button:disabled {
   border-radius: 16px;
   padding: 12px;
   background: #ffffff;
+}
+
+.history-edit-row.changed {
+  border-color: rgba(239, 68, 68, 0.28);
+  background: #fff7f8;
+}
+
+.history-edit-row.pending {
+  border-color: rgba(41, 79, 174, 0.34);
+  box-shadow: 0 12px 28px rgba(41, 79, 174, 0.08);
+}
+
+.history-edit-copy small,
+.history-edit-control small,
+.history-edit-control em {
+  display: block;
+  color: #64748b;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.history-edit-control {
+  display: grid;
+  gap: 6px;
 }
 
 .history-edit-actions {
@@ -2921,6 +2964,14 @@ button:disabled {
   font: inherit;
   font-weight: 950;
   cursor: pointer;
+  transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.person-size-edit-button:hover,
+.person-size-edit-button:focus-visible {
+  color: var(--blue);
+  background: #edf5ff;
+  box-shadow: inset 0 0 0 1px #c9d8f5;
 }
 
 .person-size-edit-button:hover,
@@ -3748,6 +3799,13 @@ button:disabled {
   font-weight: 950;
   box-shadow: 0 14px 28px rgba(220, 38, 38, 0.18);
   white-space: nowrap;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.danger-button:hover {
+  background: #b91c1c;
+  box-shadow: 0 16px 30px rgba(220, 38, 38, 0.22);
 }
 
 .table-action-button {
@@ -3761,6 +3819,15 @@ button:disabled {
   font-size: 0.86rem;
   font-weight: 950;
   white-space: nowrap;
+  cursor: pointer;
+  transition: transform 160ms ease, color 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+.table-action-button:hover,
+.table-action-button:focus-visible {
+  border-color: var(--blue);
+  color: #ffffff;
+  background: var(--blue);
 }
 
 .admin-edit-sheet {
@@ -3848,6 +3915,33 @@ button:disabled {
   font-weight: 850;
 }
 
+.issue-edit-row.is-changed {
+  border-color: rgba(239, 68, 68, 0.28);
+  background: #fff7f8;
+}
+
+.issue-edit-row.is-pending-change {
+  border-color: rgba(41, 79, 174, 0.36);
+  background: #f5f9ff;
+  box-shadow: 0 14px 28px rgba(41, 79, 174, 0.08);
+}
+
+.issue-edit-control {
+  display: grid;
+  gap: 6px;
+}
+
+.issue-edit-control em {
+  color: var(--blue-dark);
+  font-style: normal;
+  font-weight: 950;
+}
+
+.issue-edit-control small {
+  color: #64748b;
+  font-weight: 850;
+}
+
 @media (max-width: 760px) {
   .admin-edit-sheet {
     padding: 14px;
@@ -3882,6 +3976,30 @@ button:disabled {
 .issue-edit-actions {
   grid-template-columns: auto 1fr auto auto;
   margin-top: 18px;
+}
+
+.issue-edit-actions .primary-button,
+.issue-edit-actions .ghost-button,
+.history-edit-actions .primary-button,
+.history-edit-actions .ghost-button {
+  width: auto;
+  min-height: 48px;
+  border-radius: 16px;
+  padding: 0 18px;
+  font-size: 1rem;
+}
+
+@media (max-width: 760px) {
+  .issue-edit-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .issue-edit-actions .primary-button,
+  .issue-edit-actions .ghost-button,
+  .history-edit-actions .primary-button,
+  .history-edit-actions .ghost-button {
+    width: 100%;
+  }
 }
 
 .issue-date-rounds span,
