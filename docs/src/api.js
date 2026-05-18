@@ -1,5 +1,5 @@
 import { getNextRound } from "./config.js";
-import { saveLocalConfigOverride } from "./config.js";
+import { clearRuntimeConfigCache, saveLocalConfigOverride } from "./config.js";
 
 const RECORDS_KEY = "sruds_records_v1";
 const PENDING_KEY = "sruds_pending_v1";
@@ -51,7 +51,9 @@ export function createApi(config) {
         saveLocalConfigOverride(nextConfig);
         return { ok: true, config: nextConfig, message: "로컬 설정이 저장되었습니다." };
       }
-      return postAppsScript(appsScriptUrl, "saveConfig", { adminPin, config: nextConfig });
+      const result = await postAppsScript(appsScriptUrl, "saveConfig", { adminPin, config: nextConfig });
+      clearRuntimeConfigCache();
+      return result;
     },
     async changeAdminPin(currentPin, nextPin) {
       if (useLocalMock) return { ok: true, message: "로컬 모드에서는 PIN 변경을 저장하지 않습니다." };
@@ -149,7 +151,7 @@ function mockGetStatus(config, recruitNo, cohort = "") {
     recruitNo: String(recruitNo),
     completedRoundIds,
     nextRoundId: next?.roundId || null,
-    records: rows
+    records: stripPersonalPins(rows)
   };
 }
 
@@ -157,7 +159,7 @@ function mockSubmitIssue(config, payload) {
   const records = readRecords(config);
   const duplicate = records.some((row) => row.submission_id === payload.submissionId);
   if (duplicate) {
-    return { ok: true, duplicate: true, records: records.filter((row) => row.submission_id === payload.submissionId) };
+    return { ok: true, duplicate: true, records: stripPersonalPins(records.filter((row) => row.submission_id === payload.submissionId)) };
   }
 
   const duplicateRoundRows = records.filter((row) =>
@@ -166,7 +168,7 @@ function mockSubmitIssue(config, payload) {
     String(row.round_id) === String(payload.roundId)
   );
   if (duplicateRoundRows.length) {
-    return { ok: true, duplicate: true, records: duplicateRoundRows };
+    return { ok: true, duplicate: true, records: stripPersonalPins(duplicateRoundRows) };
   }
 
   const timestamp = new Date().toISOString();
@@ -211,14 +213,16 @@ function mockSubmitIssue(config, payload) {
       config_version: item.configVersion || config.configVersion
     }))
   ]);
-  return { ok: true, duplicate: false, records: rows };
+  return { ok: true, duplicate: false, records: stripPersonalPins(rows) };
 }
 
 function mockAdminSummary(config, adminPin) {
   if (!String(adminPin || "").trim()) {
     return { ok: false, message: "관리자 PIN을 입력해 주세요." };
   }
-  return { ok: true, ...buildSummary(config, readRecords(config)) };
+  const summary = buildSummary(config, readRecords(config));
+  summary.records = stripPersonalPins(summary.records);
+  return { ok: true, ...summary };
 }
 
 function mockResetAllData() {
@@ -242,7 +246,7 @@ function mockGetPersonalRecords(config, payload) {
 
   const authorizedRows = rows.filter((row) => String(row.personal_pin || "") === personalPin);
   if (!authorizedRows.length) throw new Error("개인 PIN이 일치하지 않습니다.");
-  return { ok: true, records: authorizedRows };
+  return { ok: true, records: stripPersonalPins(authorizedRows) };
 }
 
 function mockUpdatePersonalIssueRecords(config, payload) {
@@ -457,6 +461,10 @@ function buildLearningSummary(rows) {
 
 function summarySorter(a, b) {
   return String(a.roundName).localeCompare(String(b.roundName), "ko") || String(a.itemName).localeCompare(String(b.itemName), "ko") || String(a.size).localeCompare(String(b.size), "ko");
+}
+
+function stripPersonalPins(records) {
+  return records.map(({ personal_pin, ...row }) => row);
 }
 
 function savePending(payload) {

@@ -15,6 +15,7 @@ let personColumnFilters = {};
 let currentIssueSizeRows = [];
 let currentIssuePersonRows = [];
 let currentIssueSummary = null;
+let changedItemMap = new Map();
 let activeDesktopView = "issues";
 let activeIssuePanel = "size";
 let selectedIssueDate = "all";
@@ -24,6 +25,7 @@ let selectedMobileDate = "";
 let selectedMobileItemId = "all";
 let mobilePersonQuery = "";
 let draggedRoundItem = null;
+let adminLoading = false;
 const expandedConfigItems = new Set();
 const collapsedConfigStages = new Set(["cohorts", "rounds", "composition", "items"]);
 
@@ -40,16 +42,20 @@ async function init() {
 }
 
 function bindLogin() {
-  document.querySelector("#adminLogin").addEventListener("click", loadSummary);
-  document.querySelector("#adminPin").addEventListener("keydown", (event) => {
-    if (event.key === "Enter") loadSummary();
+  document.querySelector("#adminLoginForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    loadSummary();
   });
 }
 
 async function loadSummary() {
+  if (adminLoading) return;
   const pin = document.querySelector("#adminPin").value;
   currentAdminPin = pin;
   const message = document.querySelector("#adminMessage");
+  const button = document.querySelector("#adminLogin");
+  adminLoading = true;
+  if (button) button.disabled = true;
   message.textContent = "현황을 불러오는 중입니다.";
   try {
     const summary = await api.adminSummary(pin);
@@ -61,6 +67,9 @@ async function loadSummary() {
     renderDashboard(summary);
   } catch (error) {
     message.textContent = error.message || "현황을 불러오지 못했습니다.";
+  } finally {
+    adminLoading = false;
+    if (button) button.disabled = false;
   }
 }
 
@@ -76,6 +85,7 @@ function renderDashboard(summary, notice = "") {
   currentIssueSummary = issueSummary;
   currentIssueSizeRows = issueSummary.sizeSummary;
   currentIssuePersonRows = issueSummary.personSummary;
+  changedItemMap = buildChangedItemMap(summary.records || []);
   visibleSizeSummary = filterSizeRows(currentIssueSizeRows);
   visiblePersonSummary = filterPersonRows(currentIssuePersonRows);
   app.className = "admin-shell dashboard-mode";
@@ -1487,7 +1497,7 @@ function renderPersonRow(row, columns) {
       <td>${esc(row.cohort || "-")}</td>
       <td><strong>${esc(row.recruitNo)}</strong></td>
       <td>${esc(row.roundName)}</td>
-      ${columns.map((column) => `<td class="${changedItems.has(column) ? "changed-item-cell" : ""}">${esc(row.items[column] || "-")}</td>`).join("")}
+      ${columns.map((column) => renderPersonItemCell(row, column, changedItems)).join("")}
       <td>
         <button class="table-action-button" data-edit-issue data-cohort="${esc(row.cohort || "")}" data-recruit-no="${esc(row.recruitNo || "")}" data-round-id="${esc(row.roundId || "")}" type="button">수정</button>
       </td>
@@ -1495,15 +1505,39 @@ function renderPersonRow(row, columns) {
   `;
 }
 
+function renderPersonItemCell(row, column, changedItems) {
+  const value = row.items[column] || "-";
+  const changed = changedItems.has(column);
+  if (value === "-") {
+    return `<td class="${changed ? "changed-item-cell" : ""}">-</td>`;
+  }
+  return `
+    <td class="${changed ? "changed-item-cell" : ""}">
+      <button class="person-size-edit-button" data-edit-issue data-cohort="${esc(row.cohort || "")}" data-recruit-no="${esc(row.recruitNo || "")}" data-round-id="${esc(row.roundId || "")}" type="button" title="클릭해서 ${esc(column)} 사이즈 수정">
+        ${esc(value)}
+      </button>
+    </td>
+  `;
+}
+
 function getPersonChangedItems(row) {
-  return new Set((currentSummary?.records || [])
-    .filter((record) =>
-      String(record.cohort || "") === String(row.cohort || "") &&
-      String(record.recruit_no || "") === String(row.recruitNo || "") &&
-      String(record.round_id || "") === String(row.roundId || "") &&
-      (record.changed === "Y" || record.changed === true)
-    )
-    .map((record) => record.item_name));
+  return changedItemMap.get(personRoundKey(row.cohort, row.recruitNo, row.roundId)) || new Set();
+}
+
+function buildChangedItemMap(records) {
+  const map = new Map();
+  (records || []).forEach((record) => {
+    if (!(record.changed === "Y" || record.changed === true)) return;
+    const key = personRoundKey(record.cohort, record.recruit_no, record.round_id);
+    const items = map.get(key) || new Set();
+    items.add(record.item_name);
+    map.set(key, items);
+  });
+  return map;
+}
+
+function personRoundKey(cohort, recruitNo, roundId) {
+  return [String(cohort || ""), String(recruitNo || ""), String(roundId || "")].join("|");
 }
 
 function openIssueEditDialog(cohort, recruitNo, roundId) {

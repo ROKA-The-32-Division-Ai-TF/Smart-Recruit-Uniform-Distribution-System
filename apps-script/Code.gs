@@ -5,7 +5,7 @@ const EXCHANGE_SHEET = "exchange_summary";
 const CONFIG_SHEET = "runtime_config";
 const ML_SHEET = "ml_training";
 const CONFIG_CHUNK_SIZE = 45000;
-const SCRIPT_CODE_VERSION = "2026-05-18-feedback-edit-delete-v1";
+const SCRIPT_CODE_VERSION = "2026-05-18-personal-history-v2";
 
 const RAW_HEADERS = [
   "submission_id",
@@ -25,7 +25,8 @@ const RAW_HEADERS = [
   "config_version",
   "foot_size",
   "head_size",
-  "cohort"
+  "cohort",
+  "personal_pin"
 ];
 
 const ML_HEADERS = [
@@ -76,6 +77,12 @@ function doPost(e) {
     }
     if (action === "resetAllData") {
       return json_(resetAllData_(payload));
+    }
+    if (action === "getPersonalRecords") {
+      return json_(getPersonalRecords_(payload));
+    }
+    if (action === "updatePersonalIssueRecords") {
+      return json_(updatePersonalIssueRecords_(payload));
     }
     if (action === "updateIssueRecords") {
       return json_(updateIssueRecords_(payload));
@@ -162,7 +169,7 @@ function getStatus_(payload) {
     recruitNo: recruitNo,
     completedRoundIds: completedRoundIds,
     nextRoundId: nextRoundId,
-    records: rows
+    records: sanitizeRawRecordsForResponse_(rows)
   };
 }
 
@@ -179,7 +186,7 @@ function submitIssue_(payload) {
       return String(row.submission_id) === String(payload.submissionId);
     });
     if (duplicateRows.length) {
-      return { ok: true, duplicate: true, records: duplicateRows };
+      return { ok: true, duplicate: true, records: sanitizeRawRecordsForResponse_(duplicateRows) };
     }
 
     const existingRoundRows = existingRows.filter(function(row) {
@@ -188,7 +195,7 @@ function submitIssue_(payload) {
         String(row.round_id) === String(payload.roundId);
     });
     if (existingRoundRows.length) {
-      return { ok: true, duplicate: true, records: existingRoundRows };
+      return { ok: true, duplicate: true, records: sanitizeRawRecordsForResponse_(existingRoundRows) };
     }
 
     const timestamp = new Date().toISOString();
@@ -211,7 +218,8 @@ function submitIssue_(payload) {
         payload.configVersion || "",
         Number(payload.footSize) || "",
         Number(payload.headSize) || "",
-        String(payload.cohort || "")
+        String(payload.cohort || ""),
+        String(payload.personalPin || "")
       ];
     });
 
@@ -222,7 +230,7 @@ function submitIssue_(payload) {
     const records = values.map(function(row) {
       return rowToObject_(RAW_HEADERS, row);
     });
-    return { ok: true, duplicate: false, records: records };
+    return { ok: true, duplicate: false, records: sanitizeRawRecordsForResponse_(records) };
   } finally {
     lock.releaseLock();
   }
@@ -231,7 +239,9 @@ function submitIssue_(payload) {
 function adminSummary_(payload) {
   ensureSheets_();
   assertAdmin_(payload.adminPin);
-  return Object.assign({ ok: true }, buildSummary_(readRawRecords_()));
+  const summary = buildSummary_(readRawRecords_());
+  summary.records = sanitizeRawRecordsForResponse_(summary.records);
+  return Object.assign({ ok: true }, summary);
 }
 
 function getConfig_() {
@@ -275,6 +285,87 @@ function resetAllData_(payload) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function getPersonalRecords_(payload) {
+  ensureSheets_();
+  const cohort = String(payload.cohort || "").trim();
+  const recruitNo = String(payload.recruitNo || "").trim();
+  const personalPin = String(payload.personalPin || "").trim();
+  if (!cohort || !recruitNo || !personalPin) {
+    throw new Error("기수, 교번, 개인 PIN을 모두 입력해 주세요.");
+  }
+  if (!/^[0-9]{4}$/.test(personalPin)) {
+    throw new Error("개인 PIN은 숫자 4자리로 입력해 주세요.");
+  }
+
+  const rows = readRawRecords_().filter(function(row) {
+    return String(row.cohort || "") === cohort &&
+      String(row.recruit_no || "") === recruitNo;
+  });
+  if (!rows.length) return { ok: true, records: [] };
+
+  const rowsWithPin = rows.filter(function(row) {
+    return String(row.personal_pin || "") === personalPin;
+  });
+  if (!rowsWithPin.length) {
+    const hasLegacyRows = rows.some(function(row) { return !String(row.personal_pin || ""); });
+    if (hasLegacyRows) throw new Error("개인 PIN이 설정되지 않은 기존 기록입니다. 관리자에게 문의해 주세요.");
+    throw new Error("개인 PIN이 일치하지 않습니다.");
+  }
+  return { ok: true, records: sanitizeRawRecordsForResponse_(rowsWithPin) };
+}
+
+function updatePersonalIssueRecords_(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    ensureSheets_();
+    const cohort = String(payload.cohort || "").trim();
+    const recruitNo = String(payload.recruitNo || "").trim();
+    const roundId = String(payload.roundId || "").trim();
+    const personalPin = String(payload.personalPin || "").trim();
+    if (!cohort || !recruitNo || !roundId || !personalPin) {
+      throw new Error("기수, 교번, 차수, 개인 PIN이 필요합니다.");
+    }
+    if (!/^[0-9]{4}$/.test(personalPin)) {
+      throw new Error("개인 PIN은 숫자 4자리로 입력해 주세요.");
+    }
+
+    const rowsBefore = readRawRecords_();
+    const hasOwnedRows = rowsBefore.some(function(row) {
+      return String(row.cohort || "") === cohort &&
+        String(row.recruit_no || "") === recruitNo &&
+        String(row.personal_pin || "") === personalPin;
+    });
+    if (!hasOwnedRows) throw new Error("개인 PIN이 일치하지 않습니다.");
+
+    const result = updateIssueRows_(rowsBefore, {
+      cohort: cohort,
+      recruitNo: recruitNo,
+      roundId: roundId,
+      items: payload.items || [],
+      changeReason: "본인 수정",
+      personalPin: personalPin
+    });
+    writeSheet_(RAW_SHEET, RAW_HEADERS, result.rows.map(function(row) { return objectToRow_(RAW_HEADERS, row); }));
+    refreshSummaries_();
+    return { ok: true, updatedCount: result.updatedCount, message: "불출 내역을 수정했습니다." };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function sanitizeRawRecordsForResponse_(records) {
+  return records.map(function(row) {
+    return sanitizeRawRecordForResponse_(row);
+  });
+}
+
+function sanitizeRawRecordForResponse_(row) {
+  const safeRow = Object.assign({}, row);
+  delete safeRow.personal_pin;
+  return safeRow;
 }
 
 function assertAdmin_(adminPin) {
@@ -374,6 +465,7 @@ function validateSubmission_(payload) {
   if (!String(payload.cohort || "").trim()) throw new Error("기수가 없습니다.");
   if (!String(payload.recruitNo || "").trim()) throw new Error("교번이 없습니다.");
   if (!String(payload.roundId || "").trim()) throw new Error("불출 차수가 없습니다.");
+  if (!/^[0-9]{4}$/.test(String(payload.personalPin || "").trim())) throw new Error("개인 PIN은 숫자 4자리로 설정해 주세요.");
   if (!Array.isArray(payload.items) || payload.items.length === 0) throw new Error("불출 품목이 없습니다.");
 }
 
@@ -506,39 +598,52 @@ function updateIssueRecords_(payload) {
     const cohort = String(payload.cohort || "").trim();
     const recruitNo = String(payload.recruitNo || "").trim();
     const roundId = String(payload.roundId || "").trim();
-    const itemUpdates = {};
-    (payload.items || []).forEach(function(item) {
-      const itemId = String(item.itemId || "").trim();
-      if (itemId) itemUpdates[itemId] = String(item.finalSize || "").trim();
-    });
     if (!cohort || !recruitNo || !roundId) throw new Error("수정할 기수, 교번, 차수 정보가 필요합니다.");
-    if (!Object.keys(itemUpdates).length) throw new Error("수정할 품목이 없습니다.");
 
-    var updatedCount = 0;
-    const rows = readRawRecords_().map(function(row) {
-      const itemId = String(row.item_id || "");
-      const match = String(row.cohort || "") === cohort &&
-        String(row.recruit_no || "") === recruitNo &&
-        String(row.round_id || "") === roundId &&
-        Object.prototype.hasOwnProperty.call(itemUpdates, itemId);
-      if (!match) return row;
-
-      const finalSize = itemUpdates[itemId];
-      const changed = finalSize && String(finalSize) !== String(row.recommended_size || "");
-      row.final_size = finalSize;
-      row.changed = changed ? "Y" : "N";
-      row.change_reason = changed ? "관리자 수정" : "";
-      updatedCount += 1;
-      return row;
+    const result = updateIssueRows_(readRawRecords_(), {
+      cohort: cohort,
+      recruitNo: recruitNo,
+      roundId: roundId,
+      items: payload.items || [],
+      changeReason: "관리자 수정"
     });
-
-    if (!updatedCount) throw new Error("수정할 불출 기록을 찾지 못했습니다.");
-    writeSheet_(RAW_SHEET, RAW_HEADERS, rows.map(function(row) { return objectToRow_(RAW_HEADERS, row); }));
+    writeSheet_(RAW_SHEET, RAW_HEADERS, result.rows.map(function(row) { return objectToRow_(RAW_HEADERS, row); }));
     refreshSummaries_();
-    return { ok: true, updatedCount: updatedCount, message: "불출 내역을 수정했습니다." };
+    return { ok: true, updatedCount: result.updatedCount, message: "불출 내역을 수정했습니다." };
   } finally {
     lock.releaseLock();
   }
+}
+
+function updateIssueRows_(rows, options) {
+  const itemUpdates = {};
+  (options.items || []).forEach(function(item) {
+    const itemId = String(item.itemId || "").trim();
+    if (itemId) itemUpdates[itemId] = String(item.finalSize || "").trim();
+  });
+  if (!Object.keys(itemUpdates).length) throw new Error("수정할 품목이 없습니다.");
+
+  var updatedCount = 0;
+  const nextRows = rows.map(function(row) {
+    const itemId = String(row.item_id || "");
+    const baseMatch = String(row.cohort || "") === String(options.cohort || "") &&
+      String(row.recruit_no || "") === String(options.recruitNo || "") &&
+      String(row.round_id || "") === String(options.roundId || "") &&
+      Object.prototype.hasOwnProperty.call(itemUpdates, itemId);
+    const pinMatch = !options.personalPin || String(row.personal_pin || "") === String(options.personalPin || "");
+    if (!baseMatch || !pinMatch) return row;
+
+    const finalSize = itemUpdates[itemId];
+    const changed = finalSize && String(finalSize) !== String(row.recommended_size || "");
+    row.final_size = finalSize;
+    row.changed = changed ? "Y" : "N";
+    row.change_reason = changed ? String(options.changeReason || "수정") : "";
+    updatedCount += 1;
+    return row;
+  });
+
+  if (!updatedCount) throw new Error("수정할 불출 기록을 찾지 못했습니다.");
+  return { rows: nextRows, updatedCount: updatedCount };
 }
 
 function deleteIssueRecords_(payload) {

@@ -1,4 +1,6 @@
 export const CONFIG_OVERRIDE_KEY = "sruds_config_override_v1";
+const RUNTIME_CONFIG_CACHE_KEY = "sruds_runtime_config_cache_v1";
+const RUNTIME_CONFIG_CACHE_TTL_MS = 3 * 60 * 1000;
 const CURRENT_BRAND_LOGO = "assets/brand/baekryong-new-logo.gif";
 const LEGACY_BRAND_LOGOS = new Set([
   "",
@@ -116,9 +118,19 @@ export function clearLocalConfigOverride() {
   localStorage.removeItem(CONFIG_OVERRIDE_KEY);
 }
 
+export function clearRuntimeConfigCache() {
+  try {
+    sessionStorage.removeItem(RUNTIME_CONFIG_CACHE_KEY);
+  } catch {
+    // 캐시 삭제 실패는 앱 동작에 영향을 주지 않습니다.
+  }
+}
+
 async function loadRuntimeConfig(staticConfig) {
   const appsScriptUrl = String(staticConfig.api?.appsScriptUrl || "").trim();
   if (!appsScriptUrl) return readLocalConfigOverride();
+  const cached = readRuntimeConfigCache(appsScriptUrl);
+  if (cached) return cached;
 
   try {
     const response = await fetch(appsScriptUrl, {
@@ -129,9 +141,38 @@ async function loadRuntimeConfig(staticConfig) {
       body: JSON.stringify({ action: "getConfig" })
     });
     const data = await response.json();
-    return data.ok && data.config ? data.config : null;
+    if (data.ok && data.config) {
+      writeRuntimeConfigCache(appsScriptUrl, data.config);
+      return data.config;
+    }
+    return null;
   } catch {
     return null;
+  }
+}
+
+function readRuntimeConfigCache(appsScriptUrl) {
+  const search = new URLSearchParams(window.location.search);
+  if (search.has("fresh") || search.has("nocache")) return null;
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(RUNTIME_CONFIG_CACHE_KEY) || "null");
+    if (!cached || cached.appsScriptUrl !== appsScriptUrl || !cached.savedAt || !cached.config) return null;
+    if (Date.now() - Number(cached.savedAt) > RUNTIME_CONFIG_CACHE_TTL_MS) return null;
+    return cached.config;
+  } catch {
+    return null;
+  }
+}
+
+function writeRuntimeConfigCache(appsScriptUrl, config) {
+  try {
+    sessionStorage.setItem(RUNTIME_CONFIG_CACHE_KEY, JSON.stringify({
+      appsScriptUrl,
+      savedAt: Date.now(),
+      config
+    }));
+  } catch {
+    // 캐시 저장 실패는 앱 동작에 영향을 주지 않습니다.
   }
 }
 

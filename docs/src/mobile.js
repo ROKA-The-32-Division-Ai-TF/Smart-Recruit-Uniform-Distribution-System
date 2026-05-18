@@ -681,7 +681,7 @@ function openSubmitConfirm() {
   sheet.addEventListener("click", (event) => {
     if (event.target === sheet) sheet.remove();
   });
-  sheet.querySelector("[data-confirm]").addEventListener("click", () => {
+  const confirm = () => {
     const pin = sheet.querySelector("#personalPin").value.trim();
     const message = sheet.querySelector("[data-confirm-message]");
     if (!/^\d{4}$/.test(pin)) {
@@ -691,7 +691,15 @@ function openSubmitConfirm() {
     state.personalPin = pin;
     sheet.remove();
     submitIssue();
+  };
+  sheet.querySelector("[data-confirm]").addEventListener("click", confirm);
+  sheet.querySelector("#personalPin").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      confirm();
+    }
   });
+  sheet.querySelector("#personalPin").focus();
 }
 
 function buildCurrentReceiptRows() {
