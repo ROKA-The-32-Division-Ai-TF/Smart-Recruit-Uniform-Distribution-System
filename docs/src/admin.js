@@ -310,7 +310,7 @@ function renderIssueAccordion(panel, title, content) {
 
 function renderIssueAccordionActions(panel) {
   const legend = panel === "person"
-    ? `<span class="accordion-exchange-legend"><i class="exchange-dot"></i>빨간색 행은 교체 이력이 있는 인원입니다.</span>`
+    ? `<span class="accordion-exchange-legend"><i class="exchange-dot"></i>붉은색 칸은 교체한 품목입니다.</span>`
     : "";
   return `
     ${legend}
@@ -1481,17 +1481,29 @@ function renderPersonRows(rows, columns) {
 }
 
 function renderPersonRow(row, columns) {
+  const changedItems = getPersonChangedItems(row);
   return `
-    <tr class="${row.changedCount ? "changed-person-row" : ""}">
+    <tr>
       <td>${esc(row.cohort || "-")}</td>
       <td><strong>${esc(row.recruitNo)}</strong></td>
       <td>${esc(row.roundName)}</td>
-      ${columns.map((column) => `<td>${esc(row.items[column] || "-")}</td>`).join("")}
+      ${columns.map((column) => `<td class="${changedItems.has(column) ? "changed-item-cell" : ""}">${esc(row.items[column] || "-")}</td>`).join("")}
       <td>
         <button class="table-action-button" data-edit-issue data-cohort="${esc(row.cohort || "")}" data-recruit-no="${esc(row.recruitNo || "")}" data-round-id="${esc(row.roundId || "")}" type="button">수정</button>
       </td>
     </tr>
   `;
+}
+
+function getPersonChangedItems(row) {
+  return new Set((currentSummary?.records || [])
+    .filter((record) =>
+      String(record.cohort || "") === String(row.cohort || "") &&
+      String(record.recruit_no || "") === String(row.recruitNo || "") &&
+      String(record.round_id || "") === String(row.roundId || "") &&
+      (record.changed === "Y" || record.changed === true)
+    )
+    .map((record) => record.item_name));
 }
 
 function openIssueEditDialog(cohort, recruitNo, roundId) {
@@ -1605,17 +1617,21 @@ function printIssueReport(type) {
     ? ["기수", "교번", "차수", ...(currentIssueSummary?.personColumns || [])]
     : ["차수", "품목", "사이즈", "수량", "교체"];
   const bodyRows = type === "person"
-    ? rows.map((row) => ({
-        changed: Number(row.changedCount || 0) > 0,
-        cells: [
-          row.cohort || "-",
-          row.recruitNo,
-          row.roundName,
-          ...(currentIssueSummary?.personColumns || []).map((column) => row.items[column] || "-")
-        ]
-      }))
+    ? rows.map((row) => {
+        const itemColumns = currentIssueSummary?.personColumns || [];
+        const changedItems = getPersonChangedItems(row);
+        return {
+          changedIndexes: new Set(itemColumns.map((column, index) => changedItems.has(column) ? index + 3 : -1).filter((index) => index >= 0)),
+          cells: [
+            row.cohort || "-",
+            row.recruitNo,
+            row.roundName,
+            ...itemColumns.map((column) => row.items[column] || "-")
+          ]
+        };
+      })
     : rows.map((row) => ({
-        changed: false,
+        changedIndexes: new Set(),
         cells: [row.roundName, row.itemName, row.size, row.count, row.changedCount]
       }));
   const dateText = selectedIssueDate === "all" ? "전체 기간" : selectedIssueDate;
@@ -1638,7 +1654,7 @@ function printIssueReport(type) {
           th, td { border: 1px solid #cbd5e1; padding: 5px 6px; text-align: left; white-space: normal; overflow-wrap: anywhere; line-height: 1.22; }
           th { color: #17377d; background: #eef4ff; font-weight: 900; }
           td { font-weight: 700; }
-          tr.changed td { background: #fff1f2; color: #991b1b; }
+          td.changed-cell { background: #fff1f2; color: #991b1b; }
           .legend { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; color: #991b1b; font-size: 10px; font-weight: 800; }
           .legend i { width: 10px; height: 10px; border-radius: 999px; background: #ef4444; }
         </style>
@@ -1647,11 +1663,11 @@ function printIssueReport(type) {
         <main class="print-sheet">
           <h1>${esc(title)}</h1>
           <p>${esc(dateText)} · ${bodyRows.length.toLocaleString("ko-KR")}건</p>
-          ${type === "person" ? `<div class="legend"><i></i>빨간색 행은 교체 이력이 있는 인원입니다.</div>` : ""}
+          ${type === "person" ? `<div class="legend"><i></i>붉은색 표시는 교체한 품목입니다.</div>` : ""}
           <table>
             <thead><tr>${columns.map((column) => `<th>${esc(column)}</th>`).join("")}</tr></thead>
             <tbody>
-              ${bodyRows.map((row) => `<tr class="${row.changed ? "changed" : ""}">${row.cells.map((cell) => `<td>${esc(cell)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${columns.length}">인쇄할 내역이 없습니다.</td></tr>`}
+              ${bodyRows.map((row) => `<tr>${row.cells.map((cell, index) => `<td class="${row.changedIndexes?.has(index) ? "changed-cell" : ""}">${esc(cell)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${columns.length}">인쇄할 내역이 없습니다.</td></tr>`}
             </tbody>
           </table>
         </main>

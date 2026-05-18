@@ -61,6 +61,14 @@ export function createApi(config) {
       if (useLocalMock) return mockResetAllData();
       return postAppsScript(appsScriptUrl, "resetAllData", { adminPin });
     },
+    async getPersonalRecords(payload) {
+      if (useLocalMock) return mockGetPersonalRecords(config, payload);
+      return postAppsScript(appsScriptUrl, "getPersonalRecords", payload);
+    },
+    async updatePersonalIssueRecords(payload) {
+      if (useLocalMock) return mockUpdatePersonalIssueRecords(config, payload);
+      return postAppsScript(appsScriptUrl, "updatePersonalIssueRecords", payload);
+    },
     async updateIssueRecords(adminPin, payload) {
       if (useLocalMock) return mockUpdateIssueRecords(config, payload);
       return postAppsScript(appsScriptUrl, "updateIssueRecords", { adminPin, ...payload });
@@ -79,7 +87,7 @@ export function createApi(config) {
   };
 }
 
-export function buildSubmissionPayload({ config, round, profile, issueItems }) {
+export function buildSubmissionPayload({ config, round, profile, issueItems, personalPin = "" }) {
   const submissionId = `${profile.cohort || "cohort"}-${profile.recruitNo}-${round.roundId}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
   return {
     submissionId,
@@ -91,6 +99,7 @@ export function buildSubmissionPayload({ config, round, profile, issueItems }) {
     footSize: "",
     headSize: "",
     configVersion: config.configVersion,
+    personalPin,
     roundId: round.roundId,
     roundName: round.label,
     items: issueItems.map((item) => ({
@@ -178,6 +187,7 @@ function mockSubmitIssue(config, payload) {
     changed: item.changed ? "Y" : "N",
     change_reason: item.changeReason || "",
     config_version: config.configVersion,
+    personal_pin: String(payload.personalPin || ""),
     foot_size: Number(payload.footSize) || "",
     head_size: Number(payload.headSize) || ""
   }));
@@ -216,6 +226,62 @@ function mockResetAllData() {
   writeJson("sruds_learning_v1", []);
   writeJson(PENDING_KEY, []);
   return { ok: true, message: "전체 초기화가 완료되었습니다." };
+}
+
+function mockGetPersonalRecords(config, payload) {
+  const cohort = String(payload.cohort || "").trim();
+  const recruitNo = String(payload.recruitNo || "").trim();
+  const personalPin = String(payload.personalPin || "").trim();
+  if (!cohort || !recruitNo || !personalPin) throw new Error("기수, 교번, 개인 PIN을 모두 입력해 주세요.");
+
+  const rows = readRecords(config).filter((row) =>
+    String(row.cohort || "") === cohort &&
+    String(row.recruit_no || "") === recruitNo
+  );
+  if (!rows.length) return { ok: true, records: [] };
+
+  const authorizedRows = rows.filter((row) => String(row.personal_pin || "") === personalPin);
+  if (!authorizedRows.length) throw new Error("개인 PIN이 일치하지 않습니다.");
+  return { ok: true, records: authorizedRows };
+}
+
+function mockUpdatePersonalIssueRecords(config, payload) {
+  const cohort = String(payload.cohort || "").trim();
+  const recruitNo = String(payload.recruitNo || "").trim();
+  const roundId = String(payload.roundId || "").trim();
+  const personalPin = String(payload.personalPin || "").trim();
+  if (!cohort || !recruitNo || !roundId || !personalPin) throw new Error("기수, 교번, 차수, 개인 PIN이 필요합니다.");
+
+  const records = readRecords(config);
+  const ownedRows = records.filter((row) =>
+    String(row.cohort || "") === cohort &&
+    String(row.recruit_no || "") === recruitNo &&
+    String(row.personal_pin || "") === personalPin
+  );
+  if (!ownedRows.length) throw new Error("개인 PIN이 일치하지 않습니다.");
+
+  const itemUpdates = new Map((payload.items || []).map((item) => [String(item.itemId), String(item.finalSize || "")]));
+  let updatedCount = 0;
+  const nextRecords = records.map((row) => {
+    const match = String(row.cohort || "") === cohort &&
+      String(row.recruit_no || "") === recruitNo &&
+      String(row.personal_pin || "") === personalPin &&
+      String(row.round_id || "") === roundId &&
+      itemUpdates.has(String(row.item_id || ""));
+    if (!match) return row;
+    const finalSize = itemUpdates.get(String(row.item_id || ""));
+    const changed = finalSize && String(finalSize) !== String(row.recommended_size || "");
+    updatedCount += 1;
+    return {
+      ...row,
+      final_size: finalSize,
+      changed: changed ? "Y" : "N",
+      change_reason: changed ? "본인 수정" : ""
+    };
+  });
+  if (!updatedCount) throw new Error("수정할 불출 기록을 찾지 못했습니다.");
+  writeRecords(nextRecords);
+  return { ok: true, updatedCount, message: "불출 내역을 수정했습니다." };
 }
 
 function mockUpdateIssueRecords(config, payload) {

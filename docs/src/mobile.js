@@ -12,7 +12,8 @@ const state = {
   issueItems: [],
   itemIndex: 0,
   lastSavedRows: [],
-  selectedRoundId: null
+  selectedRoundId: null,
+  personalPin: ""
 };
 const ROUND_THEME_CLASSES = ["theme-round-one", "theme-round-two", "theme-round-three", "theme-round-four"];
 
@@ -62,6 +63,7 @@ function renderInput(message = "") {
         <div class="input-line"></div>
         <p class="input-note">키와 몸무게는 백룡 AI가 스마트폰 안에서 추천 계산에만 사용합니다. 최종 확정 시에는 불출받은 사이즈 정보만 안전하게 전달됩니다.</p>
         <button class="primary-button" type="submit">추천 사이즈 보기</button>
+        <button id="openHistory" class="secondary-button history-open-button" type="button">불출기록 확인</button>
         <p id="formMessage" class="form-message">${esc(message)}</p>
       </form>
       ${state.profile && state.issueItems.length ? renderRecommendationPanel(round) : ""}
@@ -70,6 +72,7 @@ function renderInput(message = "") {
   `;
 
   document.querySelector("#profileForm").addEventListener("submit", handleProfileSubmit);
+  document.querySelector("#openHistory").addEventListener("click", openPersonalHistoryDialog);
   bindRoundSwitch();
   bindRecommendationControls();
 }
@@ -102,6 +105,194 @@ function renderCohortField() {
 
 function activeCohorts() {
   return (state.config?.cohorts || []).filter((cohort) => cohort.active !== false);
+}
+
+function openPersonalHistoryDialog() {
+  document.querySelector(".history-sheet")?.remove();
+  const currentCohort = state.profile?.cohort || "";
+  const currentRecruitNo = state.profile?.recruitNo || "";
+  const sheet = document.createElement("div");
+  sheet.className = "history-sheet";
+  sheet.innerHTML = `
+    <section class="history-panel" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+      <header>
+        <div>
+          <h2 id="historyTitle">불출기록 확인</h2>
+          <p>기수, 교번, 개인 PIN을 입력하면 본인 불출기록을 확인하고 수정할 수 있습니다.</p>
+        </div>
+        <button data-history-close type="button" aria-label="닫기">×</button>
+      </header>
+      <form id="historyForm" class="history-form">
+        <label>
+          <span>기수</span>
+          ${renderHistoryCohortInput(currentCohort)}
+        </label>
+        <label>
+          <span>교번</span>
+          <input name="recruitNo" type="text" inputmode="numeric" autocomplete="off" value="${esc(currentRecruitNo)}" placeholder="교번 입력" />
+        </label>
+        <label>
+          <span>개인 PIN</span>
+          <input name="personalPin" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="4자리" />
+        </label>
+        <button class="primary-button" type="submit">기록 확인</button>
+      </form>
+      <div id="historyResult" class="history-result"></div>
+      <p id="historyMessage" class="form-message"></p>
+    </section>
+  `;
+  document.body.appendChild(sheet);
+  sheet.querySelectorAll("[data-history-close]").forEach((button) => button.addEventListener("click", () => sheet.remove()));
+  sheet.addEventListener("click", (event) => {
+    if (event.target === sheet) sheet.remove();
+  });
+  sheet.querySelector("#historyForm").addEventListener("submit", (event) => loadPersonalHistory(event, sheet));
+}
+
+function renderHistoryCohortInput(currentCohort) {
+  const cohorts = activeCohorts();
+  if (!cohorts.length) {
+    return `<input name="cohort" type="text" autocomplete="off" value="${esc(currentCohort)}" placeholder="26-1기" />`;
+  }
+  return `
+    <select name="cohort">
+      <option value="">선택</option>
+      ${cohorts.map((cohort) => `<option value="${esc(cohort.label)}" ${cohort.label === currentCohort ? "selected" : ""}>${esc(cohort.label)}</option>`).join("")}
+    </select>
+  `;
+}
+
+async function loadPersonalHistory(event, sheet) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const payload = {
+    cohort: String(form.get("cohort") || "").trim(),
+    recruitNo: String(form.get("recruitNo") || "").trim(),
+    personalPin: String(form.get("personalPin") || "").trim()
+  };
+  const message = sheet.querySelector("#historyMessage");
+  const result = sheet.querySelector("#historyResult");
+  if (!payload.cohort || !payload.recruitNo || !/^\d{4}$/.test(payload.personalPin)) {
+    message.textContent = "기수, 교번, 개인 PIN 4자리를 입력해 주세요.";
+    return;
+  }
+  message.textContent = "기록을 확인하는 중입니다.";
+  result.innerHTML = "";
+  try {
+    const response = await state.api.getPersonalRecords(payload);
+    message.textContent = "";
+    renderPersonalHistoryResult(sheet, payload, response.records || []);
+  } catch (error) {
+    message.textContent = error.message || "불출기록을 확인하지 못했습니다.";
+  }
+}
+
+function renderPersonalHistoryResult(sheet, auth, records) {
+  const result = sheet.querySelector("#historyResult");
+  if (!records.length) {
+    result.innerHTML = `<p class="history-empty">확인되는 불출기록이 없습니다.</p>`;
+    return;
+  }
+  const grouped = groupPersonalRecords(records);
+  result.innerHTML = Object.values(grouped).map((group) => `
+    <article class="history-round-card">
+      <header>
+        <strong>${esc(group.roundName)}</strong>
+        <button data-history-edit-round="${esc(group.roundId)}" type="button">수정</button>
+      </header>
+      <div class="history-record-list">
+        ${group.rows.map((row) => `
+          <div class="${isChangedRecord(row) ? "changed" : ""}">
+            <span>${esc(row.item_name)}</span>
+            <strong>${esc(row.final_size || "-")}</strong>
+          </div>
+        `).join("")}
+      </div>
+    </article>
+  `).join("");
+
+  result.querySelectorAll("[data-history-edit-round]").forEach((button) => {
+    button.addEventListener("click", () => renderPersonalEditForm(sheet, auth, grouped[button.dataset.historyEditRound]));
+  });
+}
+
+function renderPersonalEditForm(sheet, auth, group) {
+  const result = sheet.querySelector("#historyResult");
+  result.innerHTML = `
+    <article class="history-edit-card">
+      <header>
+        <div>
+          <strong>${esc(group.roundName)} 수정</strong>
+          <small>교체한 항목은 관리자 화면과 원본 기록에 함께 반영됩니다.</small>
+        </div>
+        <button data-history-back type="button">돌아가기</button>
+      </header>
+      <div class="history-edit-list">
+        ${group.rows.map((row) => renderPersonalEditRow(row)).join("")}
+      </div>
+      <div class="history-edit-actions">
+        <button class="ghost-button" data-history-back type="button">취소</button>
+        <button class="primary-button" data-history-save type="button">수정 저장</button>
+      </div>
+    </article>
+  `;
+  result.querySelectorAll("[data-history-back]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const response = await state.api.getPersonalRecords(auth);
+      renderPersonalHistoryResult(sheet, auth, response.records || []);
+    });
+  });
+  result.querySelector("[data-history-save]").addEventListener("click", () => savePersonalHistoryEdit(sheet, auth, group.roundId));
+}
+
+function renderPersonalEditRow(row) {
+  const item = state.config.items.find((candidate) => candidate.itemId === row.item_id);
+  const sizes = uniqueStrings([row.final_size, ...(item?.sizes || [])]);
+  return `
+    <label class="history-edit-row">
+      <span>
+        <strong>${esc(row.item_name)}</strong>
+        <small>추천 ${esc(row.recommended_size || "-")}</small>
+      </span>
+      <select data-history-item-id="${esc(row.item_id)}">
+        ${sizes.map((size) => `<option value="${esc(size)}" ${String(size) === String(row.final_size) ? "selected" : ""}>${esc(size)}</option>`).join("")}
+      </select>
+    </label>
+  `;
+}
+
+async function savePersonalHistoryEdit(sheet, auth, roundId) {
+  const message = sheet.querySelector("#historyMessage");
+  const button = sheet.querySelector("[data-history-save]");
+  const items = [...sheet.querySelectorAll("[data-history-item-id]")].map((select) => ({
+    itemId: select.dataset.historyItemId,
+    finalSize: select.value
+  }));
+  button.disabled = true;
+  message.textContent = "수정 내용을 저장하는 중입니다.";
+  try {
+    await state.api.updatePersonalIssueRecords({ ...auth, roundId, items });
+    const response = await state.api.getPersonalRecords(auth);
+    message.textContent = "수정 내용을 반영했습니다.";
+    renderPersonalHistoryResult(sheet, auth, response.records || []);
+  } catch (error) {
+    message.textContent = error.message || "수정에 실패했습니다.";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function groupPersonalRecords(records) {
+  return records.reduce((acc, row) => {
+    const roundId = row.round_id || row.roundId || row.round_name || "round";
+    acc[roundId] = acc[roundId] || {
+      roundId,
+      roundName: row.round_name || row.roundName || "불출 내역",
+      rows: []
+    };
+    acc[roundId].rows.push(row);
+    return acc;
+  }, {});
 }
 
 async function handleProfileSubmit(event) {
@@ -465,6 +656,11 @@ function openSubmitConfirm() {
     <div class="confirm-panel" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
       <h2 id="confirmTitle">최종 확정할까요?</h2>
       <p>이 버튼을 누르면 현재 선택된 사이즈가 불출 내역으로 저장됩니다. 확정 후 교체나 수정은 현장 관리자 확인이 필요하니, 사이즈 교체가 필요하면 먼저 품목 카드를 눌러 수정해 주세요.</p>
+      <label class="pin-setup-field">
+        <span>개인 확인 PIN 4자리</span>
+        <input id="personalPin" type="password" inputmode="numeric" maxlength="4" autocomplete="new-password" placeholder="예: 1234" />
+        <small>나중에 본인 불출기록을 확인하거나 수정할 때 사용합니다.</small>
+      </label>
       <div class="confirm-summary">
         ${state.issueItems.map((item) => `
           <span>
@@ -477,6 +673,7 @@ function openSubmitConfirm() {
         <button class="ghost-button" type="button" data-cancel>취소</button>
         <button class="primary-button" type="button" data-confirm>확정</button>
       </div>
+      <p class="form-message" data-confirm-message></p>
     </div>
   `;
   document.body.appendChild(sheet);
@@ -485,6 +682,13 @@ function openSubmitConfirm() {
     if (event.target === sheet) sheet.remove();
   });
   sheet.querySelector("[data-confirm]").addEventListener("click", () => {
+    const pin = sheet.querySelector("#personalPin").value.trim();
+    const message = sheet.querySelector("[data-confirm-message]");
+    if (!/^\d{4}$/.test(pin)) {
+      message.textContent = "개인 확인 PIN은 숫자 4자리로 입력해 주세요.";
+      return;
+    }
+    state.personalPin = pin;
     sheet.remove();
     submitIssue();
   });
@@ -531,7 +735,8 @@ async function submitIssue() {
     config: state.config,
     round: state.round,
     profile: state.profile,
-    issueItems: state.issueItems
+    issueItems: state.issueItems,
+    personalPin: state.personalPin
   });
 
   try {
@@ -753,6 +958,22 @@ function rowsByRound(rows) {
     acc[key].push(row);
     return acc;
   }, {});
+}
+
+function isChangedRecord(row) {
+  return row?.changed === "Y" || row?.changed === true;
+}
+
+function uniqueStrings(values) {
+  const seen = new Set();
+  return values
+    .map((value) => String(value || "").trim())
+    .filter((value) => {
+      if (!value || seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    })
+    .sort((a, b) => a.localeCompare(b, "ko"));
 }
 
 function setBusy(isBusy, message) {
